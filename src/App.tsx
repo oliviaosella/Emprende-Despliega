@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
-import { AppProvider } from './AppContext';
+import { AppProvider, useAppContext } from './AppContext';
 import { BottomNav, TabType } from './components/BottomNav';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
@@ -13,11 +13,20 @@ import { Login } from './pages/Login';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function AppContent() {
+  const { loading } = useAppContext();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 text-lg animate-pulse">Cargando datos...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex">
