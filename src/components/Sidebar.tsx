@@ -5,15 +5,17 @@ import {
   ShoppingCart,
   Truck,
   Calculator,
-  Sparkles } from
+  Sparkles,
+  LogOut } from
 'lucide-react';
 import { motion } from 'framer-motion';
 import { TabType } from './BottomNav';
 interface SidebarProps {
   activeTab: TabType;
   onChangeTab: (tab: TabType) => void;
+  onLogout?: () => void;
 }
-export function Sidebar({ activeTab, onChangeTab }: SidebarProps) {
+export function Sidebar({ activeTab, onChangeTab, onLogout }: SidebarProps) {
   const tabs = [
   {
     id: 'dashboard',
@@ -85,8 +87,16 @@ export function Sidebar({ activeTab, onChangeTab }: SidebarProps) {
         })}
       </div>
 
-      <div className="p-6 border-t border-slate-50">
-        <div className="bg-slate-50 p-4 rounded-xl">
+      <div className="p-6 border-t border-slate-50 space-y-3">
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors">
+            <LogOut size={18} />
+            <span className="font-medium text-sm">Cerrar sesión</span>
+          </button>
+        )}
+        <div className="bg-slate-50 p-3 rounded-xl">
           <p className="text-xs text-slate-500 text-center">
             App de Gestión v1.0
           </p>
