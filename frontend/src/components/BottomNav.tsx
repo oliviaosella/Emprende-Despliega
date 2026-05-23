@@ -13,6 +13,7 @@ export type TabType =
   | 'sales'
   | 'purchases'
   | 'accounting'
+  | 'profile'
 
 interface BottomNavProps {
   activeTab: TabType

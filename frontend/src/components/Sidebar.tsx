@@ -5,6 +5,7 @@ import {
   Truck,
   Calculator,
   Sparkles,
+  User,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { TabType } from './BottomNav'
@@ -40,6 +41,11 @@ export function Sidebar({ activeTab, onChangeTab }: SidebarProps) {
       id: 'accounting',
       label: 'Contabilidad',
       icon: Calculator,
+    },
+    {
+      id: 'profile',
+      label: 'Mi Perfil',
+      icon: User,
     },
   ] as const
 
