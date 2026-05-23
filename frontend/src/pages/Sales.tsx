@@ -10,53 +10,45 @@ import {
   CircleDashed,
   PlayCircle,
   PackageSearch,
+  History,
+  Receipt,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SaleItem, Product } from '../types'
 
+type ViewTab = 'vender' | 'pedidos' | 'historial'
+
 export function Sales() {
-  const { products, sales, addSale, completePedido, updatePedidoStatus } =
-    useAppContext()
-  const [view, setView] = useState<'vender' | 'pedidos'>('vender')
+  const { products, sales, addSale, completePedido, updatePedidoStatus } = useAppContext()
+
+  const [view, setView] = useState<ViewTab>('vender')
   const [cart, setCart] = useState<SaleItem[]>([])
   const [isConfirming, setIsConfirming] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<
-    'Efectivo' | 'Transferencia' | 'Tarjeta'
-  >('Transferencia')
-  // Pedido specific state
+  const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Transferencia' | 'Tarjeta'>('Transferencia')
   const [isPedidoToggle, setIsPedidoToggle] = useState(false)
   const [pedidoDesc, setPedidoDesc] = useState('')
   const [pedidoDeadline, setPedidoDeadline] = useState('')
-  const [pedidoReminder, setPedidoReminder] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos')
 
-  const categories = [
-    'Todos',
-    ...Array.from(new Set(products.map((p) => p.category))),
-  ]
+  const categories = ['Todos', ...Array.from(new Set(products.map((p) => p.category)))]
 
   const filteredProducts =
-    selectedCategory === 'Todos'
-      ? products
-      : products.filter((p) => p.category === selectedCategory)
+    selectedCategory === 'Todos' ? products : products.filter((p) => p.category === selectedCategory)
 
   const pedidos = sales
     .filter((s) => s.isPedido)
-    .sort(
-      (a, b) =>
-        new Date(a.pedidoDeadline || 0).getTime() -
-        new Date(b.pedidoDeadline || 0).getTime(),
-    )
+    .sort((a, b) => new Date(a.pedidoDeadline || 0).getTime() - new Date(b.pedidoDeadline || 0).getTime())
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-      maximumFractionDigits: 0,
-    }).format(amount)
-  }
+  const salesHistory = sales
+    .filter((s) => !s.isPedido)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(amount)
+
+  // ── Cart ──────────────────────────────────────────────────────────────────
 
   const addToCart = (product: Product) => {
     if (product.stock <= 0) return
@@ -65,64 +57,45 @@ export function Sales() {
       if (existing) {
         if (existing.qty >= product.stock) return prev
         return prev.map((item) =>
-          item.productId === product.id
-            ? {
-                ...item,
-                qty: item.qty + 1,
-              }
-            : item,
+          item.productId === product.id ? { ...item, qty: item.qty + 1 } : item,
         )
       }
-      return [
-        ...prev,
-        {
-          productId: product.id,
-          qty: 1,
-          unitPrice: product.salePrice,
-        },
-      ]
+      return [...prev, { productId: product.id, qty: 1, unitPrice: product.salePrice }]
     })
   }
 
   const updateQty = (productId: string, delta: number) => {
-    setCart((prev) => {
-      return prev
+    setCart((prev) =>
+      prev
         .map((item) => {
           if (item.productId === productId) {
             const product = products.find((p) => p.id === productId)
-            const newQty = Math.max(
-              0,
-              Math.min(item.qty + delta, product?.stock || 0),
-            )
-            return {
-              ...item,
-              qty: newQty,
-            }
+            const newQty = Math.max(0, Math.min(item.qty + delta, product?.stock || 0))
+            return { ...item, qty: newQty }
           }
           return item
         })
-        .filter((item) => item.qty > 0)
-    })
+        .filter((item) => item.qty > 0),
+    )
   }
 
-  const cartTotal = cart.reduce(
-    (sum, item) => sum + item.qty * item.unitPrice,
-    0,
-  )
+  const removeFromCart = (productId: string) => {
+    setCart((prev) => prev.filter((item) => item.productId !== productId))
+  }
+
+  const cartTotal = cart.reduce((sum, item) => sum + item.qty * item.unitPrice, 0)
   const cartItemsCount = cart.reduce((sum, item) => sum + item.qty, 0)
+
+  // ── Confirm ───────────────────────────────────────────────────────────────
 
   const handleConfirmSale = () => {
     if (cart.length === 0) return
     if (isPedidoToggle) {
       if (!pedidoDeadline) {
-        alert('Por favor ingresa una fecha de entrega para el pedido.')
+        alert('Por favor ingresá una fecha de entrega para el pedido.')
         return
       }
-      addSale(cart, paymentMethod, {
-        description: pedidoDesc,
-        deadline: pedidoDeadline,
-        reminder: pedidoReminder,
-      })
+      addSale(cart, paymentMethod, { description: pedidoDesc, deadline: pedidoDeadline })
       setToastMessage('¡Pedido registrado!')
     } else {
       addSale(cart, paymentMethod)
@@ -133,15 +106,15 @@ export function Sales() {
     setIsPedidoToggle(false)
     setPedidoDesc('')
     setPedidoDeadline('')
-    setPedidoReminder('')
     setShowSuccess(true)
-    setTimeout(() => setShowSuccess(false), 2000)
+    setTimeout(() => setShowSuccess(false), 2500)
   }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   const getDeadlineColor = (deadline?: string, status?: string) => {
     if (!deadline || status === 'completado') return 'text-slate-500'
-    const days =
-      (new Date(deadline).getTime() - new Date().getTime()) / (1000 * 3600 * 24)
+    const days = (new Date(deadline).getTime() - new Date().getTime()) / (1000 * 3600 * 24)
     if (days < 0) return 'text-red-500 font-bold'
     if (days <= 2) return 'text-yellow-600 font-bold'
     return 'text-slate-500'
@@ -149,55 +122,42 @@ export function Sales() {
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
-      case 'pendiente':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-      case 'en_progreso':
-        return 'bg-blue-100 text-blue-700 border-blue-200'
-      case 'completado':
-        return 'bg-green-100 text-green-700 border-green-200'
-      default:
-        return 'bg-slate-100 text-slate-700'
+      case 'pendiente': return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+      case 'en_progreso': return 'bg-blue-100 text-blue-700 border-blue-200'
+      case 'completado': return 'bg-green-100 text-green-700 border-green-200'
+      default: return 'bg-slate-100 text-slate-700'
     }
   }
 
   const getStatusLabel = (status?: string) => {
     switch (status) {
-      case 'pendiente':
-        return 'Pendiente'
-      case 'en_progreso':
-        return 'En progreso'
-      case 'completado':
-        return 'Completado'
-      default:
-        return status
+      case 'pendiente': return 'Pendiente'
+      case 'en_progreso': return 'En progreso'
+      case 'completado': return 'Completado'
+      default: return status
     }
   }
 
   return (
     <div className="h-full flex flex-col relative">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="bg-white p-6 pb-2 rounded-b-3xl shadow-sm border-b border-lilac-50 z-10">
-        <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 mb-4">
-          Ventas
-        </h1>
+        <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 mb-4">Ventas</h1>
 
-        {/* Segmented Control */}
-        <div className="bg-slate-100 p-1 rounded-xl flex mb-4 max-w-md">
-          <button
-            onClick={() => setView('vender')}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${view === 'vender' ? 'bg-white shadow-sm text-lilac-600' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Vender
-          </button>
-          <button
-            onClick={() => setView('pedidos')}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${view === 'pedidos' ? 'bg-white shadow-sm text-lilac-600' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Pedidos
-          </button>
+        {/* Segmented Control — 3 tabs */}
+        <div className="bg-slate-100 p-1 rounded-xl flex mb-4">
+          {(['vender', 'pedidos', 'historial'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setView(tab)}
+              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all capitalize ${view === tab ? 'bg-white shadow-sm text-lilac-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              {tab === 'vender' ? 'Vender' : tab === 'pedidos' ? 'Pedidos' : 'Historial'}
+            </button>
+          ))}
         </div>
 
-        {/* Category Pills (Only in Vender view) */}
+        {/* Category pills — solo en Vender */}
         {view === 'vender' && (
           <div className="flex overflow-x-auto gap-2 pb-4 hide-scrollbar">
             {categories.map((cat) => (
@@ -213,58 +173,79 @@ export function Sales() {
         )}
       </div>
 
-      {/* Main Content Area */}
+      {/* ── Main Content ── */}
       <div className="flex-1 overflow-y-auto p-4 lg:p-6 pb-40 lg:pb-24">
-        {view === 'vender' ? (
+
+        {/* ── VENDER ── */}
+        {view === 'vender' && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredProducts.map((product) => {
-              const cartItem = cart.find(
-                (item) => item.productId === product.id,
-              )
+              const cartItem = cart.find((item) => item.productId === product.id)
               const isOutOfStock = product.stock <= 0
               return (
-                <motion.button
+                <motion.div
                   key={product.id}
-                  whileTap={
-                    !isOutOfStock
-                      ? {
-                          scale: 0.95,
-                        }
-                      : {}
-                  }
-                  onClick={() => addToCart(product)}
-                  disabled={isOutOfStock}
-                  className={`relative bg-white p-3 rounded-2xl border text-left flex flex-col h-full transition-shadow ${cartItem ? 'border-pink-400 shadow-md shadow-pink-100' : 'border-slate-100 shadow-sm'} ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
+                  layout
+                  className={`relative bg-white p-3 rounded-2xl border flex flex-col transition-shadow ${cartItem ? 'border-pink-400 shadow-md shadow-pink-100' : 'border-slate-100 shadow-sm'} ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
                 >
+                  {/* Clickable area — solo cuando no está en carrito */}
+                  <button
+                    onClick={() => !cartItem && addToCart(product)}
+                    disabled={isOutOfStock}
+                    className="flex-1 flex flex-col w-full text-left"
+                  >
+                    <div className="text-4xl mb-2 text-center bg-slate-50 rounded-xl py-4">
+                      {product.emoji}
+                    </div>
+                    <h3 className="font-semibold text-slate-800 text-sm leading-tight mb-1 flex-1">
+                      {product.name}
+                    </h3>
+                    <div className="flex justify-between items-end mt-2 w-full">
+                      <p className="font-bold text-lilac-600 text-sm">{formatCurrency(product.salePrice)}</p>
+                      <p className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                        {product.stock} disp.
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Controles de cantidad — visible cuando está en carrito */}
                   {cartItem && (
-                    <div className="absolute -top-2 -right-2 bg-pink-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm z-10">
-                      {cartItem.qty}
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-pink-100 gap-1">
+                      <button
+                        onClick={() => updateQty(product.id, -1)}
+                        className="w-7 h-7 bg-pink-50 text-pink-600 rounded-lg flex items-center justify-center font-bold text-lg hover:bg-pink-100 transition-colors"
+                      >
+                        <Minus size={13} />
+                      </button>
+                      <span className="font-bold text-slate-800 text-sm min-w-[1.25rem] text-center">
+                        {cartItem.qty}
+                      </span>
+                      <button
+                        onClick={() => addToCart(product)}
+                        className="w-7 h-7 bg-pink-50 text-pink-600 rounded-lg flex items-center justify-center font-bold hover:bg-pink-100 transition-colors"
+                      >
+                        <Plus size={13} />
+                      </button>
+                      <button
+                        onClick={() => removeFromCart(product.id)}
+                        className="w-7 h-7 bg-red-50 text-red-400 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors ml-1"
+                        title="Quitar del carrito"
+                      >
+                        <X size={13} />
+                      </button>
                     </div>
                   )}
-                  <div className="text-4xl mb-2 text-center bg-slate-50 rounded-xl py-4">
-                    {product.emoji}
-                  </div>
-                  <h3 className="font-semibold text-slate-800 text-sm leading-tight mb-1 flex-1">
-                    {product.name}
-                  </h3>
-                  <div className="flex justify-between items-end mt-2 w-full">
-                    <p className="font-bold text-lilac-600 text-sm">
-                      {formatCurrency(product.salePrice)}
-                    </p>
-                    <p className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                      {product.stock} disp.
-                    </p>
-                  </div>
-                </motion.button>
+                </motion.div>
               )
             })}
           </div>
-        ) : (
+        )}
+
+        {/* ── PEDIDOS ── */}
+        {view === 'pedidos' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {pedidos.map((pedido) => {
-              const mainProduct = products.find(
-                (p) => p.id === pedido.items[0].productId,
-              )
+              const mainProduct = products.find((p) => p.id === pedido.items[0]?.productId)
               const statusColor =
                 pedido.pedidoStatus === 'pendiente'
                   ? 'border-l-yellow-400'
@@ -274,50 +255,36 @@ export function Sales() {
               return (
                 <motion.div
                   key={pedido.id}
-                  initial={{
-                    opacity: 0,
-                    y: 10,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                   className={`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm border-l-4 ${statusColor}`}
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-3">
                       <div className="text-3xl bg-slate-50 p-2 rounded-xl">
-                        {mainProduct?.emoji}
+                        {mainProduct?.emoji ?? '📦'}
                       </div>
                       <div>
                         <h3 className="font-bold text-slate-800 text-sm">
-                          {mainProduct?.name}{' '}
-                          {pedido.items.length > 1 &&
-                            `+${pedido.items.length - 1}`}
+                          {mainProduct?.name ?? 'Pedido'}{pedido.items.length > 1 && ` +${pedido.items.length - 1}`}
                         </h3>
-                        <p
-                          className={`text-xs flex items-center gap-1 mt-1 ${getDeadlineColor(pedido.pedidoDeadline, pedido.pedidoStatus)}`}
-                        >
+                        <p className={`text-xs flex items-center gap-1 mt-1 ${getDeadlineColor(pedido.pedidoDeadline, pedido.pedidoStatus)}`}>
                           <CalendarClock size={12} />
                           Entrega:{' '}
                           {pedido.pedidoDeadline
-                            ? new Date(
-                                pedido.pedidoDeadline,
-                              ).toLocaleDateString('es-AR')
+                            ? new Date(pedido.pedidoDeadline).toLocaleDateString('es-AR')
                             : 'Sin fecha'}
                         </p>
                       </div>
                     </div>
-                    <div
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${getStatusBadge(pedido.pedidoStatus)}`}
-                    >
+                    <div className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${getStatusBadge(pedido.pedidoStatus)}`}>
                       {getStatusLabel(pedido.pedidoStatus)}
                     </div>
                   </div>
 
                   {pedido.pedidoDescription && (
                     <div className="bg-slate-50 p-3 rounded-xl mb-3">
-                      <p className="text-xs text-slate-600 italic">
+                      <p className="text-xs text-slate-600 italic leading-relaxed">
                         "{pedido.pedidoDescription}"
                       </p>
                     </div>
@@ -325,20 +292,13 @@ export function Sales() {
 
                   <div className="flex justify-between items-center pt-3 border-t border-slate-100">
                     <div>
-                      <p className="text-xs text-slate-400">
-                        Total ({pedido.paymentMethod})
-                      </p>
-                      <p className="font-bold text-slate-800">
-                        {formatCurrency(pedido.total)}
-                      </p>
+                      <p className="text-xs text-slate-400">Total ({pedido.paymentMethod})</p>
+                      <p className="font-bold text-slate-800">{formatCurrency(pedido.total)}</p>
                     </div>
-
                     <div className="flex gap-2">
                       {pedido.pedidoStatus === 'pendiente' && (
                         <button
-                          onClick={() =>
-                            updatePedidoStatus(pedido.id, 'en_progreso')
-                          }
+                          onClick={() => updatePedidoStatus(pedido.id, 'en_progreso')}
                           className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
                         >
                           <PlayCircle size={14} /> Iniciar
@@ -363,31 +323,86 @@ export function Sales() {
               )
             })}
             {pedidos.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
+              <div className="col-span-full text-center py-12 text-slate-400">
                 <PackageSearch size={48} className="mx-auto mb-4 opacity-20" />
-                <p>No hay pedidos registrados.</p>
+                <p className="font-medium">No hay pedidos registrados.</p>
+                <p className="text-sm mt-1">Los pedidos aparecen aquí al registrar una venta como pedido.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── HISTORIAL ── */}
+        {view === 'historial' && (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-400 mb-4">
+              {salesHistory.length} venta{salesHistory.length !== 1 ? 's' : ''} registrada{salesHistory.length !== 1 ? 's' : ''}
+            </p>
+            {salesHistory.map((sale) => (
+              <motion.div
+                key={sale.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm"
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-2">
+                    <Receipt size={15} className="text-slate-400" />
+                    <p className="text-xs text-slate-500">
+                      {new Date(sale.date).toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}{' '}
+                      ·{' '}
+                      {new Date(sale.date).toLocaleTimeString('es-AR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                    {sale.paymentMethod}
+                  </span>
+                </div>
+
+                <div className="space-y-1 my-2">
+                  {sale.items.map((item, idx) => {
+                    const product = products.find((p) => p.id === item.productId)
+                    return (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-slate-600">
+                          {product?.emoji} {item.qty}× {product?.name ?? 'Producto'}
+                        </span>
+                        <span className="text-slate-500">{formatCurrency(item.qty * item.unitPrice)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                  <span className="text-xs text-slate-400">Total</span>
+                  <span className="font-bold text-slate-800">{formatCurrency(sale.total)}</span>
+                </div>
+              </motion.div>
+            ))}
+            {salesHistory.length === 0 && (
+              <div className="text-center py-12 text-slate-400">
+                <History size={48} className="mx-auto mb-4 opacity-20" />
+                <p className="font-medium">No hay ventas registradas.</p>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Cart Summary Bar */}
+      {/* ── Cart Bar ── */}
       <AnimatePresence>
         {cart.length > 0 && !isConfirming && view === 'vender' && (
           <motion.div
-            initial={{
-              y: 100,
-              opacity: 0,
-            }}
-            animate={{
-              y: 0,
-              opacity: 1,
-            }}
-            exit={{
-              y: 100,
-              opacity: 0,
-            }}
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
             className="absolute bottom-24 lg:bottom-8 left-4 right-4 lg:left-auto lg:right-8 lg:w-96 bg-slate-800 text-white rounded-2xl p-4 shadow-xl flex justify-between items-center z-40 cursor-pointer hover:bg-slate-700 transition-colors"
             onClick={() => setIsConfirming(true)}
           >
@@ -396,9 +411,7 @@ export function Sales() {
                 <ShoppingBag size={20} />
               </div>
               <div>
-                <p className="text-sm font-medium opacity-80">
-                  {cartItemsCount} items
-                </p>
+                <p className="text-sm font-medium opacity-80">{cartItemsCount} items</p>
                 <p className="font-bold text-lg">{formatCurrency(cartTotal)}</p>
               </div>
             </div>
@@ -409,38 +422,22 @@ export function Sales() {
         )}
       </AnimatePresence>
 
-      {/* Confirmation Modal/Sheet */}
+      {/* ── Confirmation Sheet ── */}
       <AnimatePresence>
         {isConfirming && (
           <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center pointer-events-none">
             <motion.div
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-              }}
-              exit={{
-                opacity: 0,
-              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm pointer-events-auto"
               onClick={() => setIsConfirming(false)}
             />
             <motion.div
-              initial={{
-                y: '100%',
-              }}
-              animate={{
-                y: 0,
-              }}
-              exit={{
-                y: '100%',
-              }}
-              transition={{
-                type: 'spring',
-                damping: 25,
-                stiffness: 200,
-              }}
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="relative w-full lg:w-[500px] bg-white rounded-t-3xl lg:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col pointer-events-auto"
             >
               <div className="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
@@ -454,25 +451,17 @@ export function Sales() {
               </div>
 
               <div className="p-4 overflow-y-auto flex-1">
+                {/* Items del carrito */}
                 <div className="space-y-3 mb-6">
                   {cart.map((item) => {
-                    const product = products.find(
-                      (p) => p.id === item.productId,
-                    )!
+                    const product = products.find((p) => p.id === item.productId)!
                     return (
-                      <div
-                        key={item.productId}
-                        className="flex justify-between items-center"
-                      >
+                      <div key={item.productId} className="flex justify-between items-center">
                         <div className="flex items-center gap-3 flex-1">
                           <span className="text-2xl">{product.emoji}</span>
                           <div>
-                            <p className="text-sm font-medium text-slate-800">
-                              {product.name}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {formatCurrency(item.unitPrice)} c/u
-                            </p>
+                            <p className="text-sm font-medium text-slate-800">{product.name}</p>
+                            <p className="text-xs text-slate-500">{formatCurrency(item.unitPrice)} c/u</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -483,9 +472,7 @@ export function Sales() {
                             >
                               <Minus size={14} />
                             </button>
-                            <span className="w-4 text-center font-bold text-sm">
-                              {item.qty}
-                            </span>
+                            <span className="w-4 text-center font-bold text-sm">{item.qty}</span>
                             <button
                               onClick={() => updateQty(item.productId, 1)}
                               className="w-6 h-6 flex items-center justify-center bg-white rounded shadow-sm text-slate-600"
@@ -502,38 +489,31 @@ export function Sales() {
                   })}
                 </div>
 
+                {/* Método de pago */}
                 <div className="mb-6">
-                  <p className="text-sm font-semibold text-slate-800 mb-2">
-                    Método de Pago
-                  </p>
+                  <p className="text-sm font-semibold text-slate-800 mb-2">Método de Pago</p>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['Efectivo', 'Transferencia', 'Tarjeta'] as const).map(
-                      (method) => (
-                        <button
-                          key={method}
-                          onClick={() => setPaymentMethod(method)}
-                          className={`py-2 rounded-xl text-xs font-medium border transition-colors ${paymentMethod === method ? 'bg-lilac-50 border-lilac-300 text-lilac-700' : 'bg-white border-slate-200 text-slate-600'}`}
-                        >
-                          {method}
-                        </button>
-                      ),
-                    )}
+                    {(['Efectivo', 'Transferencia', 'Tarjeta'] as const).map((method) => (
+                      <button
+                        key={method}
+                        onClick={() => setPaymentMethod(method)}
+                        className={`py-2 rounded-xl text-xs font-medium border transition-colors ${paymentMethod === method ? 'bg-lilac-50 border-lilac-300 text-lilac-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                      >
+                        {method}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Pedido Toggle & Fields */}
+                {/* Toggle pedido */}
                 <div className="mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <CircleDashed
                         size={18}
-                        className={
-                          isPedidoToggle ? 'text-lilac-500' : 'text-slate-400'
-                        }
+                        className={isPedidoToggle ? 'text-lilac-500' : 'text-slate-400'}
                       />
-                      <span className="text-sm font-semibold text-slate-800">
-                        ¿Es un pedido?
-                      </span>
+                      <span className="text-sm font-semibold text-slate-800">¿Es un pedido?</span>
                     </div>
                     <button
                       onClick={() => setIsPedidoToggle(!isPedidoToggle)}
@@ -549,62 +529,37 @@ export function Sales() {
                   <AnimatePresence>
                     {isPedidoToggle && (
                       <motion.div
-                        initial={{
-                          height: 0,
-                          opacity: 0,
-                          marginTop: 0,
-                        }}
-                        animate={{
-                          height: 'auto',
-                          opacity: 1,
-                          marginTop: 16,
-                        }}
-                        exit={{
-                          height: 0,
-                          opacity: 0,
-                          marginTop: 0,
-                        }}
-                        className="space-y-3 overflow-hidden"
+                        initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                        animate={{ height: 'auto', opacity: 1, marginTop: 16 }}
+                        exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                        className="space-y-3"
+                        style={{ overflow: 'hidden' }}
                       >
+                        {/* Descripción — textarea completo */}
                         <div>
-                          <label className="text-xs text-slate-500 mb-1 block">
+                          <label className="text-xs text-slate-500 mb-1 block font-medium">
                             Descripción del pedido
                           </label>
                           <textarea
-                            placeholder="Ej: Cuaderno A5 con nombre grabado..."
+                            placeholder="Ej: Cuaderno A5 con nombre grabado, color azul..."
                             value={pedidoDesc}
                             onChange={(e) => setPedidoDesc(e.target.value)}
                             className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-lilac-300 outline-none resize-none"
-                            rows={2}
+                            rows={3}
                           />
                         </div>
-                        <div className="flex gap-3">
-                          <div className="flex-1">
-                            <label className="text-xs text-slate-500 mb-1 block font-medium">
-                              Fecha de entrega *
-                            </label>
-                            <input
-                              type="date"
-                              value={pedidoDeadline}
-                              onChange={(e) =>
-                                setPedidoDeadline(e.target.value)
-                              }
-                              className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-lilac-300"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label className="text-xs text-slate-500 mb-1 block">
-                              Recordatorio (opc)
-                            </label>
-                            <input
-                              type="date"
-                              value={pedidoReminder}
-                              onChange={(e) =>
-                                setPedidoReminder(e.target.value)
-                              }
-                              className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-lilac-300"
-                            />
-                          </div>
+
+                        {/* Fecha de entrega — ocupa todo el ancho */}
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block font-medium">
+                            Fecha de entrega *
+                          </label>
+                          <input
+                            type="date"
+                            value={pedidoDeadline}
+                            onChange={(e) => setPedidoDeadline(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-lilac-300"
+                          />
                         </div>
                       </motion.div>
                     )}
@@ -612,14 +567,11 @@ export function Sales() {
                 </div>
               </div>
 
+              {/* Footer fijo */}
               <div className="p-4 bg-white border-t border-slate-100 shrink-0 pb-8 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-slate-500 font-medium">
-                    Total a cobrar
-                  </span>
-                  <span className="text-2xl font-bold text-slate-800">
-                    {formatCurrency(cartTotal)}
-                  </span>
+                  <span className="text-slate-500 font-medium">Total a cobrar</span>
+                  <span className="text-2xl font-bold text-slate-800">{formatCurrency(cartTotal)}</span>
                 </div>
                 <button
                   onClick={handleConfirmSale}
@@ -634,22 +586,13 @@ export function Sales() {
         )}
       </AnimatePresence>
 
-      {/* Success Toast */}
+      {/* ── Toast de éxito ── */}
       <AnimatePresence>
         {showSuccess && (
           <motion.div
-            initial={{
-              opacity: 0,
-              y: -50,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            exit={{
-              opacity: 0,
-              y: -50,
-            }}
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
             className="absolute top-8 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg font-medium flex items-center gap-2 z-50 whitespace-nowrap"
           >
             <CheckCircle2 size={20} />

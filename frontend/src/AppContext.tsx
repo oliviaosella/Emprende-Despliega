@@ -156,9 +156,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         date: new Date().toISOString(),
         payment_method: paymentMethod,
         is_pedido: pedidoData ? true : false,
-        pedido_description: pedidoData?.description ?? null,
-        pedido_deadline: pedidoData?.deadline ?? null,
-        pedido_reminder: pedidoData?.reminder ?? null,
+        pedido_description: pedidoData?.description || null,
+        pedido_deadline: pedidoData?.deadline || null,
+        pedido_reminder: pedidoData?.reminder || null,
         pedido_status: pedidoData ? 'pendiente' : null,
       })
       .select()

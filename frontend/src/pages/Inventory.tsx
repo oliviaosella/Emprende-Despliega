@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAppContext } from '../AppContext'
-import { Search, Plus, Edit2, Check, X } from 'lucide-react'
+import { Search, Plus, Edit2, Check, X, History, Truck } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Category } from '../types'
 
@@ -28,11 +28,12 @@ const EMPTY_FORM: ProductForm = {
 }
 
 export function Inventory() {
-  const { products, updateProductStock, addProduct } = useAppContext()
+  const { products, purchases, updateProductStock, addProduct } = useAppContext()
   const [searchTerm, setSearchTerm] = useState('')
   const [editingStockId, setEditingStockId] = useState<string | null>(null)
   const [tempStock, setTempStock] = useState<number>(0)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [historyProductId, setHistoryProductId] = useState<string | null>(null)
   const [form, setForm] = useState<ProductForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
 
@@ -120,10 +121,17 @@ export function Inventory() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-slate-800 truncate">{product.name}</h3>
                       <p className="text-xs text-slate-400">{product.category}</p>
                     </div>
+                    <button
+                      onClick={() => setHistoryProductId(product.id)}
+                      className="text-slate-300 hover:text-lilac-400 transition-colors ml-1 shrink-0"
+                      title="Ver historial de compras"
+                    >
+                      <History size={15} />
+                    </button>
                   </div>
 
                   <div className="flex justify-between items-end mt-2">
@@ -181,6 +189,84 @@ export function Inventory() {
           </div>
         )}
       </div>
+
+      {/* Modal historial de compras por producto */}
+      <AnimatePresence>
+        {historyProductId && (() => {
+          const prod = products.find((p) => p.id === historyProductId)
+          const productPurchases = purchases
+            .flatMap((pu) =>
+              pu.items
+                .filter((item) => item.productId === historyProductId)
+                .map((item) => ({ ...item, supplier: pu.supplier, date: pu.date, purchaseId: pu.id })),
+            )
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+          const formatCurrency = (n: number) =>
+            new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 z-50 flex items-end lg:items-center justify-center p-4"
+              onClick={(e) => e.target === e.currentTarget && setHistoryProductId(null)}
+            >
+              <motion.div
+                initial={{ y: 60, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 60, opacity: 0 }}
+                className="bg-white rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col shadow-xl"
+              >
+                <div className="flex justify-between items-center p-5 border-b border-slate-100 shrink-0">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-800">
+                      {prod?.emoji} {prod?.name}
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">Historial de compras al proveedor</p>
+                  </div>
+                  <button onClick={() => setHistoryProductId(null)} className="text-slate-400 hover:text-slate-600">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 p-4">
+                  {productPurchases.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400">
+                      <Truck size={32} className="mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No hay compras registradas para este producto.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {productPurchases.map((item, idx) => (
+                        <div key={idx} className="bg-slate-50 rounded-xl p-3 flex justify-between items-center">
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                              <Truck size={12} />
+                              <span className="font-medium">{item.supplier}</span>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              {new Date(item.date).toLocaleDateString('es-AR', {
+                                day: '2-digit', month: 'short', year: 'numeric',
+                              })}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-slate-800 text-sm">{item.qty} unid.</p>
+                            <p className="text-xs text-slate-400">{formatCurrency(item.unitCost)} c/u</p>
+                            <p className="text-xs font-medium text-lilac-600">{formatCurrency(item.qty * item.unitCost)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )
+        })()}
+      </AnimatePresence>
 
       {/* Modal agregar producto */}
       <AnimatePresence>
