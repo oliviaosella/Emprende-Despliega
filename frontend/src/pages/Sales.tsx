@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppContext } from '../AppContext'
 import {
   ShoppingBag,
@@ -16,9 +16,14 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SaleItem, Product } from '../types'
 
-type ViewTab = 'vender' | 'pedidos' | 'historial'
+export type ViewTab = 'vender' | 'pedidos' | 'historial'
 
-export function Sales() {
+interface SalesProps {
+  forcedView?: ViewTab | null
+  onForcedViewApplied?: () => void
+}
+
+export function Sales({ forcedView, onForcedViewApplied }: SalesProps) {
   const { products, sales, addSale, completePedido, updatePedidoStatus } = useAppContext()
 
   const [view, setView] = useState<ViewTab>('vender')
@@ -47,6 +52,12 @@ export function Sales() {
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(amount)
+
+  useEffect(() => {
+    if (!forcedView || forcedView === view) return
+    setView(forcedView)
+    onForcedViewApplied?.()
+  }, [forcedView, onForcedViewApplied, view])
 
   // ── Cart ──────────────────────────────────────────────────────────────────
 
@@ -306,7 +317,12 @@ export function Sales() {
                       )}
                       {pedido.pedidoStatus === 'en_progreso' && (
                         <button
-                          onClick={() => completePedido(pedido.id)}
+                          onClick={async () => {
+                            await completePedido(pedido.id)
+                            setToastMessage('Venta de pedido registrada!')
+                            setShowSuccess(true)
+                            setTimeout(() => setShowSuccess(false), 2500)
+                          }}
                           className="flex items-center gap-1 bg-green-50 text-green-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-100 transition-colors"
                         >
                           <CheckCircle2 size={14} /> Completar

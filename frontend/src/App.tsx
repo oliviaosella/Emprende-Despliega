@@ -7,7 +7,7 @@ import { BottomNav, type TabType } from './components/BottomNav'
 import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './pages/Dashboard'
 import { Inventory } from './pages/Inventory'
-import { Sales } from './pages/Sales'
+import { Sales, type ViewTab } from './pages/Sales'
 import { Purchases } from './pages/Purchases'
 import { Accounting } from './pages/Accounting'
 import { Profile } from './pages/Profile'
@@ -16,7 +16,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
+  const [salesViewOverride, setSalesViewOverride] = useState<ViewTab | null>(null)
   const { loading } = useAppContext()
+
+  const openPendingOrders = () => {
+    setActiveTab('sales')
+    setSalesViewOverride('pedidos')
+  }
 
   if (loading) {
     return (
@@ -62,9 +68,16 @@ function AppContent() {
               transition={{ duration: 0.2 }}
               className="h-full"
             >
-              {activeTab === 'dashboard' && <Dashboard />}
+              {activeTab === 'dashboard' && (
+                <Dashboard onOpenPedidos={openPendingOrders} />
+              )}
               {activeTab === 'inventory' && <Inventory />}
-              {activeTab === 'sales' && <Sales />}
+              {activeTab === 'sales' && (
+                <Sales
+                  forcedView={salesViewOverride}
+                  onForcedViewApplied={() => setSalesViewOverride(null)}
+                />
+              )}
               {activeTab === 'purchases' && <Purchases />}
               {activeTab === 'accounting' && <Accounting />}
               {activeTab === 'profile' && <Profile />}

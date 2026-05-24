@@ -21,7 +21,11 @@ import {
   YAxis,
 } from 'recharts'
 
-export function Dashboard() {
+interface DashboardProps {
+  onOpenPedidos?: () => void
+}
+
+export function Dashboard({ onOpenPedidos }: DashboardProps) {
   const { products, sales, accounting } = useAppContext()
   const [businessName, setBusinessName] = useState('tu emprendimiento')
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null)
@@ -135,6 +139,17 @@ export function Dashboard() {
     }
   }, [weeklyProfitData])
 
+  const pendingOrders = useMemo(() => {
+    return sales
+      .filter((sale) => sale.isPedido && sale.pedidoStatus !== 'completado')
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.pedidoDeadline || 0).getTime() - new Date(b.pedidoDeadline || 0).getTime(),
+      )
+      .slice(0, 3)
+  }, [sales])
+
   const recentSales = useMemo(() => {
     return sales
       .filter((sale) => !sale.isPedido || sale.pedidoStatus === 'completado')
@@ -149,6 +164,15 @@ export function Dashboard() {
       month: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+    })
+  }
+
+  const formatDeadline = (date?: string) => {
+    if (!date) return 'Sin fecha'
+    return new Date(date).toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
     })
   }
 
@@ -273,7 +297,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div>
+        <div className="space-y-6">
           {lowStockProducts.length > 0 ? (
             <div className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-red-100 bg-red-50/60">
@@ -309,6 +333,48 @@ export function Dashboard() {
               </p>
             </div>
           )}
+
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 mb-3">Pedidos Pendientes</h2>
+            <div className="grid grid-cols-1 gap-3">
+              {pendingOrders.map((order) => (
+                <button
+                  key={order.id}
+                  type="button"
+                  onClick={onOpenPedidos}
+                  disabled={!onOpenPedidos}
+                  className={`bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-left transition-all ${onOpenPedidos ? 'hover:border-lilac-200 hover:shadow-md' : ''}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">
+                        {order.pedidoDescription || `Pedido #${order.id.slice(-4)}`}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Entrega: {formatDeadline(order.pedidoDeadline)}
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-yellow-50 text-yellow-700">
+                      {order.pedidoStatus === 'en_progreso' ? 'En progreso' : 'Pendiente'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-3">
+                    <p className="text-xs text-slate-400">
+                      {order.items.reduce((sum, item) => sum + item.qty, 0)} productos
+                    </p>
+                    <p className="text-sm font-bold text-lilac-600">
+                      {formatCurrency(order.total)}
+                    </p>
+                  </div>
+                </button>
+              ))}
+              {pendingOrders.length === 0 && (
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-sm text-slate-400">No hay pedidos pendientes.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
