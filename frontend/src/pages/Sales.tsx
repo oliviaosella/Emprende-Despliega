@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useAppContext } from '../AppContext'
 import {
   ShoppingBag,
@@ -11,7 +11,6 @@ import {
   PlayCircle,
   PackageSearch,
   History,
-  Receipt,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SaleItem, Product } from '../types'
@@ -36,6 +35,16 @@ export function Sales({ forcedView, onForcedViewApplied }: SalesProps) {
   const [showSuccess, setShowSuccess] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos')
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
+  const [historyQuery, setHistoryQuery] = useState('')
+  const [historyType, setHistoryType] = useState<'todos' | 'venta' | 'pedido'>('todos')
+  const [historyMethod, setHistoryMethod] = useState<'todos' | 'Efectivo' | 'Transferencia' | 'Tarjeta'>('todos')
+  const [historyRange, setHistoryRange] = useState<'todos' | 'hoy' | '7dias' | 'mes' | 'rango'>('todos')
+  const [historyStartDate, setHistoryStartDate] = useState('')
+  const [historyEndDate, setHistoryEndDate] = useState('')
+  const [historyMinAmount, setHistoryMinAmount] = useState('')
+  const [historyMaxAmount, setHistoryMaxAmount] = useState('')
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
   const categories = ['Todos', ...Array.from(new Set(products.map((p) => p.category)))]
 
@@ -47,11 +56,87 @@ export function Sales({ forcedView, onForcedViewApplied }: SalesProps) {
     .sort((a, b) => new Date(a.pedidoDeadline || 0).getTime() - new Date(b.pedidoDeadline || 0).getTime())
 
   const salesHistory = sales
-    .filter((s) => !s.isPedido)
+    .slice()
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(amount)
+
+  const formatDateShort = (date: string | Date) => {
+    const value = typeof date === 'string' ? new Date(date) : date
+    return value.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+    })
+  }
+
+  const formatTimeShort = (date: string | Date) => {
+    const value = typeof date === 'string' ? new Date(date) : date
+    return value.toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const filteredHistory = useMemo(() => {
+    const query = historyQuery.trim().toLowerCase()
+    const minAmount = historyMinAmount ? Number(historyMinAmount) : null
+    const maxAmount = historyMaxAmount ? Number(historyMaxAmount) : null
+
+    const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    const endOfDay = (date: Date) =>
+      new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999)
+
+    const now = new Date()
+    const todayStart = startOfDay(now)
+    const todayEnd = endOfDay(now)
+    const weekStart = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6))
+    const monthStart = startOfDay(new Date(now.getFullYear(), now.getMonth(), 1))
+    const monthEnd = endOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0))
+
+    const rangeStart = historyStartDate ? startOfDay(new Date(historyStartDate)) : null
+    const rangeEnd = historyEndDate ? endOfDay(new Date(historyEndDate)) : null
+
+    return salesHistory.filter((sale) => {
+      if (historyType === 'venta' && sale.isPedido) return false
+      if (historyType === 'pedido' && !sale.isPedido) return false
+
+      if (historyMethod !== 'todos' && sale.paymentMethod !== historyMethod) return false
+
+      if (minAmount !== null && sale.total < minAmount) return false
+      if (maxAmount !== null && sale.total > maxAmount) return false
+
+      const saleDate = new Date(sale.date)
+      if (historyRange === 'hoy' && (saleDate < todayStart || saleDate > todayEnd)) return false
+      if (historyRange === '7dias' && (saleDate < weekStart || saleDate > todayEnd)) return false
+      if (historyRange === 'mes' && (saleDate < monthStart || saleDate > monthEnd)) return false
+      if (historyRange === 'rango') {
+        if (rangeStart && saleDate < rangeStart) return false
+        if (rangeEnd && saleDate > rangeEnd) return false
+      }
+
+      if (!query) return true
+      const matchesId = sale.id.toLowerCase().includes(query)
+      const matchesDesc = sale.pedidoDescription?.toLowerCase().includes(query) ?? false
+      const matchesProducts = sale.items.some((item) => {
+        const product = products.find((p) => p.id === item.productId)
+        return product?.name.toLowerCase().includes(query) ?? false
+      })
+      return matchesId || matchesDesc || matchesProducts
+    })
+  }, [
+    historyEndDate,
+    historyMaxAmount,
+    historyMethod,
+    historyMinAmount,
+    historyQuery,
+    historyRange,
+    historyStartDate,
+    historyType,
+    products,
+    salesHistory,
+  ])
 
   useEffect(() => {
     if (!forcedView || forcedView === view) return
@@ -281,9 +366,8 @@ export function Sales({ forcedView, onForcedViewApplied }: SalesProps) {
                         </h3>
                         <p className={`text-xs flex items-center gap-1 mt-1 ${getDeadlineColor(pedido.pedidoDeadline, pedido.pedidoStatus)}`}>
                           <CalendarClock size={12} />
-                          Entrega:{' '}
-                          {pedido.pedidoDeadline
-                            ? new Date(pedido.pedidoDeadline).toLocaleDateString('es-AR')
+                          Entrega: {pedido.pedidoDeadline
+                            ? formatDateShort(pedido.pedidoDeadline)
                             : 'Sin fecha'}
                         </p>
                       </div>
@@ -352,57 +436,198 @@ export function Sales({ forcedView, onForcedViewApplied }: SalesProps) {
         {view === 'historial' && (
           <div className="space-y-3">
             <p className="text-sm text-slate-400 mb-4">
-              {salesHistory.length} venta{salesHistory.length !== 1 ? 's' : ''} registrada{salesHistory.length !== 1 ? 's' : ''}
+              {filteredHistory.length} venta{filteredHistory.length !== 1 ? 's' : ''} registrada{filteredHistory.length !== 1 ? 's' : ''}
             </p>
-            {salesHistory.map((sale) => (
-              <motion.div
-                key={sale.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm"
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center gap-2">
-                    <Receipt size={15} className="text-slate-400" />
-                    <p className="text-xs text-slate-500">
-                      {new Date(sale.date).toLocaleDateString('es-AR', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}{' '}
-                      ·{' '}
-                      {new Date(sale.date).toLocaleTimeString('es-AR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500">Rango</label>
+                <select
+                  value={historyRange}
+                  onChange={(e) => setHistoryRange(e.target.value as typeof historyRange)}
+                  className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                >
+                  <option value="todos">Todas las fechas</option>
+                  <option value="hoy">Hoy</option>
+                  <option value="7dias">Ultimos 7 dias</option>
+                  <option value="mes">Este mes</option>
+                  <option value="rango">Rango personalizado</option>
+                </select>
+              </div>
+
+              {historyRange === 'rango' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-500">Desde</label>
+                    <input
+                      type="date"
+                      value={historyStartDate}
+                      onChange={(e) => setHistoryStartDate(e.target.value)}
+                      className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                    />
                   </div>
-                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
-                    {sale.paymentMethod}
-                  </span>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500">Hasta</label>
+                    <input
+                      type="date"
+                      value={historyEndDate}
+                      onChange={(e) => setHistoryEndDate(e.target.value)}
+                      className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                    />
+                  </div>
                 </div>
+              )}
 
-                <div className="space-y-1 my-2">
-                  {sale.items.map((item, idx) => {
-                    const product = products.find((p) => p.id === item.productId)
-                    return (
-                      <div key={idx} className="flex justify-between text-sm">
-                        <span className="text-slate-600">
-                          {product?.emoji} {item.qty}× {product?.name ?? 'Producto'}
-                        </span>
-                        <span className="text-slate-500">{formatCurrency(item.qty * item.unitPrice)}</span>
+              <button
+                type="button"
+                onClick={() => setShowAdvancedFilters((prev) => !prev)}
+                className="text-sm font-semibold text-lilac-600 hover:text-lilac-700"
+              >
+                {showAdvancedFilters ? 'Ocultar filtros opcionales' : 'Mostrar filtros opcionales'}
+              </button>
+
+              {showAdvancedFilters && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-500">Buscar</label>
+                      <input
+                        type="text"
+                        value={historyQuery}
+                        onChange={(e) => setHistoryQuery(e.target.value)}
+                        placeholder="Codigo, producto o pedido"
+                        className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-slate-500">Tipo</label>
+                        <select
+                          value={historyType}
+                          onChange={(e) => setHistoryType(e.target.value as typeof historyType)}
+                          className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                        >
+                          <option value="todos">Todos</option>
+                          <option value="venta">Ventas</option>
+                          <option value="pedido">Pedidos</option>
+                        </select>
                       </div>
-                    )
-                  })}
-                </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500">Metodo</label>
+                        <select
+                          value={historyMethod}
+                          onChange={(e) => setHistoryMethod(e.target.value as typeof historyMethod)}
+                          className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                        >
+                          <option value="todos">Todos</option>
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Transferencia">Transferencia</option>
+                          <option value="Tarjeta">Tarjeta</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
 
-                <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-                  <span className="text-xs text-slate-400">Total</span>
-                  <span className="font-bold text-slate-800">{formatCurrency(sale.total)}</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-500">Monto min</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={historyMinAmount}
+                        onChange={(e) => setHistoryMinAmount(e.target.value)}
+                        className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500">Monto max</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={historyMaxAmount}
+                        onChange={(e) => setHistoryMaxAmount(e.target.value)}
+                        className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </motion.div>
-            ))}
-            {salesHistory.length === 0 && (
+              )}
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="text-left font-semibold px-4 py-3">Código</th>
+                      <th className="text-left font-semibold px-4 py-3">Fecha</th>
+                      <th className="text-left font-semibold px-4 py-3">Método</th>
+                      <th className="text-left font-semibold px-4 py-3">Tipo</th>
+                      <th className="text-right font-semibold px-4 py-3">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredHistory.map((sale) => {
+                      const isExpanded = expandedHistoryId === sale.id
+                      return (
+                        <Fragment key={sale.id}>
+                          <tr
+                            className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer"
+                            onClick={() =>
+                              setExpandedHistoryId(isExpanded ? null : sale.id)
+                            }
+                          >
+                            <td className="px-4 py-3 font-medium text-slate-700">
+                              #{sale.id.slice(-4)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatDateShort(sale.date)} · {formatTimeShort(sale.date)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {sale.paymentMethod}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                                {sale.isPedido ? 'Pedido' : 'Venta'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold text-slate-700">
+                              {formatCurrency(sale.total)}
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr className="border-t border-slate-100 bg-slate-50/60">
+                              <td colSpan={5} className="px-4 py-3">
+                                <div className="space-y-2">
+                                  {sale.items.map((item, idx) => {
+                                    const product = products.find((p) => p.id === item.productId)
+                                    return (
+                                      <div key={idx} className="flex justify-between text-sm">
+                                        <span className="text-slate-600">
+                                          {product?.emoji} {item.qty}× {product?.name ?? 'Producto'}
+                                        </span>
+                                        <span className="text-slate-500">
+                                          {formatCurrency(item.qty * item.unitPrice)}
+                                        </span>
+                                      </div>
+                                    )
+                                  })}
+                                  <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                                    <span className="text-xs text-slate-400">Total</span>
+                                    <span className="font-bold text-slate-800">
+                                      {formatCurrency(sale.total)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {filteredHistory.length === 0 && (
               <div className="text-center py-12 text-slate-400">
                 <History size={48} className="mx-auto mb-4 opacity-20" />
                 <p className="font-medium">No hay ventas registradas.</p>
