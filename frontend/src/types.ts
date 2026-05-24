@@ -1,4 +1,4 @@
-export type Category = 'Cuadernos' | 'Arte' | 'Papelería' | 'Accesorios'
+export type Category = string
 
 export interface Product {
   id: string

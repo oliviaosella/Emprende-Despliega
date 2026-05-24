@@ -27,6 +27,8 @@ interface AppContextType {
   addPurchase: (supplier: string, items: PurchaseItem[]) => Promise<void>
   addAccountingEntry: (entry: Omit<AccountingEntry, 'id' | 'date'>) => Promise<void>
   updateProductStock: (productId: string, newStock: number) => Promise<void>
+  updateProduct: (productId: string, updates: Omit<Product, 'id'>) => Promise<void>
+  deleteProduct: (productId: string) => Promise<void>
 }
 
 // ── DB row → app type mappers ──────────────────────────────────────────────
@@ -140,6 +142,39 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .select()
       .single()
     if (data) setProducts((prev) => [...prev, rowToProduct(data)])
+  }
+
+  const updateProduct = async (productId: string, updates: Omit<Product, 'id'>) => {
+    const { data, error } = await supabase
+      .from('products')
+      .update({
+        name: updates.name,
+        category: updates.category,
+        cost_price: updates.costPrice,
+        sale_price: updates.salePrice,
+        stock: updates.stock,
+        min_stock: updates.minStock,
+        emoji: updates.emoji,
+      })
+      .eq('id', productId)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    if (data) {
+      setProducts((prev) => prev.map((p) => (p.id === productId ? rowToProduct(data) : p)))
+    } else {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { id: productId, ...updates } : p)),
+      )
+    }
+  }
+
+  const deleteProduct = async (productId: string) => {
+    const { error } = await supabase.from('products').delete().eq('id', productId)
+    if (error) throw error
+    setProducts((prev) => prev.filter((p) => p.id !== productId))
   }
 
   const addSale = async (
@@ -312,6 +347,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         addPurchase,
         addAccountingEntry,
         updateProductStock,
+        updateProduct,
+        deleteProduct,
       }}
     >
       {children}

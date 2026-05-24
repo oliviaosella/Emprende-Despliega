@@ -50,7 +50,7 @@ export function BottomNav({ activeTab, onChangeTab }: BottomNavProps) {
   ] as const
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-gradient-to-t from-white via-white to-transparent z-50 lg:hidden pointer-events-none">
+    <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-gradient-to-t from-white via-white to-transparent z-40 lg:hidden pointer-events-none">
       <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-lilac-100 p-2 flex justify-between items-center relative overflow-hidden pointer-events-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon
