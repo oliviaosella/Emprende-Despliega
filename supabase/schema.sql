@@ -108,3 +108,19 @@ create policy "own_purchase_items" on purchase_items for all
   with check (
     exists (select 1 from purchases where purchases.id = purchase_items.purchase_id and purchases.user_id = auth.uid())
   );
+
+-- Supplies (insumos para compras)
+create table if not exists supplies (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  name         text not null,
+  category     text not null,
+  unit_cost    integer not null,
+  emoji        text not null default '📋',
+  created_at   timestamptz default now()
+);
+
+alter table supplies enable row level security;
+
+create policy "own_supplies" on supplies for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);

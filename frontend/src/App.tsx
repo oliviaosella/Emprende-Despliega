@@ -9,6 +9,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Inventory } from './pages/Inventory'
 import { Sales, type ViewTab } from './pages/Sales'
 import { Purchases } from './pages/Purchases'
+import { Supplies } from './pages/Supplies'
 import { Accounting } from './pages/Accounting'
 import { Profile } from './pages/Profile'
 import { Login } from './pages/Login'
@@ -17,11 +18,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [salesViewOverride, setSalesViewOverride] = useState<ViewTab | null>(null)
+  const [replenishmentProductId, setReplenishmentProductId] = useState<string | null>(null)
   const { loading } = useAppContext()
 
   const openPendingOrders = () => {
     setActiveTab('sales')
     setSalesViewOverride('pedidos')
+  }
+
+  const handleReplenish = (productId: string) => {
+    setReplenishmentProductId(productId)
+    setActiveTab('purchases')
   }
 
   if (loading) {
@@ -69,7 +76,7 @@ function AppContent() {
               className="h-full"
             >
               {activeTab === 'dashboard' && (
-                <Dashboard onOpenPedidos={openPendingOrders} />
+                <Dashboard onOpenPedidos={openPendingOrders} onReplenish={handleReplenish} />
               )}
               {activeTab === 'inventory' && <Inventory />}
               {activeTab === 'sales' && (
@@ -78,7 +85,13 @@ function AppContent() {
                   onForcedViewApplied={() => setSalesViewOverride(null)}
                 />
               )}
-              {activeTab === 'purchases' && <Purchases />}
+              {activeTab === 'purchases' && (
+                <Purchases
+                  preselectedProductId={replenishmentProductId}
+                  onProductSelected={() => setReplenishmentProductId(null)}
+                />
+              )}
+              {activeTab === 'supplies' && <Supplies />}
               {activeTab === 'accounting' && <Accounting />}
               {activeTab === 'profile' && <Profile />}
             </motion.div>

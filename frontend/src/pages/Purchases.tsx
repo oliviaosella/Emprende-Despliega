@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppContext } from '../AppContext'
 import {
   Truck,
@@ -9,17 +9,19 @@ import {
   Package,
   PenLine,
   ChevronDown,
+  Boxes,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { PurchaseItem } from '../types'
 
 // ── Tipos locales del formulario ───────────────────────────────────────────
 
-type ItemMode = 'inventory' | 'manual'
+type ItemMode = 'inventory' | 'supplies' | 'manual'
 
 interface CartItem {
   mode: ItemMode
   productId?: string
+  supplyId?: string
   name: string
   qty: number
   unitCost: number
@@ -36,8 +38,13 @@ const formatCurrency = (n: number) =>
 
 // ── Componente principal ───────────────────────────────────────────────────
 
-export function Purchases() {
-  const { purchases, products, addPurchase } = useAppContext()
+interface PurchasesProps {
+  preselectedProductId?: string | null
+  onProductSelected?: () => void
+}
+
+export function Purchases({ preselectedProductId, onProductSelected }: PurchasesProps) {
+  const { purchases, products, supplies, addPurchase } = useAppContext()
 
   const [showForm, setShowForm] = useState(false)
   const [supplier, setSupplier] = useState('')
@@ -48,6 +55,10 @@ export function Purchases() {
   const [selectedProductId, setSelectedProductId] = useState('')
   const [invQty, setInvQty] = useState(1)
 
+  // Estado para item de insumo
+  const [selectedSupplyId, setSelectedSupplyId] = useState('')
+  const [supplyQty, setSupplyQty] = useState(1)
+
   // Estado para item manual
   const [manualName, setManualName] = useState('')
   const [manualQty, setManualQty] = useState(1)
@@ -56,6 +67,16 @@ export function Purchases() {
   const [saving, setSaving] = useState(false)
   const [successRef, setSuccessRef] = useState<string | null>(null)
   const [errors, setErrors] = useState<string[]>([])
+  const [expandedPurchaseItemKey, setExpandedPurchaseItemKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (preselectedProductId && !showForm) {
+      setSelectedProductId(preselectedProductId)
+      setShowForm(true)
+      setItemMode('inventory')
+      onProductSelected?.()
+    }
+  }, [preselectedProductId, showForm, onProductSelected])
 
   const total = cartItems.reduce((sum, i) => sum + i.qty * i.unitCost, 0)
 
@@ -85,6 +106,31 @@ export function Purchases() {
     })
     setSelectedProductId('')
     setInvQty(1)
+  }
+
+  const handleAddSupplyItem = () => {
+    const supply = supplies.find((s) => s.id === selectedSupplyId)
+    if (!supply) return
+    setCartItems((prev) => {
+      const existing = prev.findIndex((i) => i.supplyId === selectedSupplyId)
+      if (existing >= 0) {
+        return prev.map((i, idx) =>
+          idx === existing ? { ...i, qty: i.qty + supplyQty } : i,
+        )
+      }
+      return [
+        ...prev,
+        {
+          mode: 'supplies',
+          supplyId: supply.id,
+          name: `${supply.emoji} ${supply.name}`,
+          qty: supplyQty,
+          unitCost: supply.unitCost,
+        },
+      ]
+    })
+    setSelectedSupplyId('')
+    setSupplyQty(1)
   }
 
   const handleAddManualItem = () => {
@@ -147,6 +193,8 @@ export function Purchases() {
     setItemMode('inventory')
     setSelectedProductId('')
     setInvQty(1)
+    setSelectedSupplyId('')
+    setSupplyQty(1)
     setManualName('')
     setManualQty(1)
     setManualPrice('')
@@ -208,16 +256,48 @@ export function Purchases() {
               </div>
 
               <div className="bg-slate-50 rounded-xl p-3 space-y-1">
-                {purchase.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-sm">
-                    <span className="text-slate-600">
-                      {item.qty}× {productName(item)}
-                    </span>
-                    <span className="text-slate-400">
-                      {formatCurrency(item.unitCost * item.qty)}
-                    </span>
-                  </div>
-                ))}
+                {purchase.items.map((item, idx) => {
+                  const itemKey = `${purchase.id}-${idx}`
+                  const isExpanded = expandedPurchaseItemKey === itemKey
+                  return (
+                    <div key={itemKey}>
+                      <button
+                        onClick={() => setExpandedPurchaseItemKey(isExpanded ? null : itemKey)}
+                        className="w-full flex justify-between items-center text-sm hover:bg-slate-100 p-2 -m-2 rounded transition"
+                      >
+                        <span className="text-slate-600">
+                          {item.qty}× {productName(item)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400">
+                            {formatCurrency(item.unitCost * item.qty)}
+                          </span>
+                          <ChevronDown
+                            size={14}
+                            className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          />
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="bg-blue-50 p-2 rounded text-xs text-slate-500 space-y-1 mt-1">
+                          <div className="flex justify-between">
+                            <span>Costo unitario:</span>
+                            <span className="font-medium">{formatCurrency(item.unitCost)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Cantidad:</span>
+                            <span className="font-medium">{item.qty}</span>
+                          </div>
+                          <div className="border-t border-blue-100 pt-1 flex justify-between font-medium text-slate-700">
+                            <span>Subtotal:</span>
+                            <span>{formatCurrency(item.unitCost * item.qty)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </motion.div>
           ))}
@@ -319,20 +399,30 @@ export function Purchases() {
                       <label className="block text-xs font-medium text-slate-500 mb-2">
                         Agregar artículo
                       </label>
-                      <div className="flex bg-slate-100 rounded-xl p-1 mb-3">
+                      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-3">
                         <button
                           onClick={() => setItemMode('inventory')}
-                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${itemMode === 'inventory' ? 'bg-white text-lilac-600 shadow-sm' : 'text-slate-500'}`}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors ${itemMode === 'inventory' ? 'bg-white text-lilac-600 shadow-sm' : 'text-slate-500'}`}
                         >
-                          <Package size={15} />
-                          Del inventario
+                          <Package size={14} />
+                          <span className="hidden sm:inline">Inventario</span>
+                          <span className="sm:hidden">Inv.</span>
+                        </button>
+                        <button
+                          onClick={() => setItemMode('supplies')}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors ${itemMode === 'supplies' ? 'bg-white text-lilac-600 shadow-sm' : 'text-slate-500'}`}
+                        >
+                          <Boxes size={14} />
+                          <span className="hidden sm:inline">Insumos</span>
+                          <span className="sm:hidden">Ins.</span>
                         </button>
                         <button
                           onClick={() => setItemMode('manual')}
-                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${itemMode === 'manual' ? 'bg-white text-lilac-600 shadow-sm' : 'text-slate-500'}`}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors ${itemMode === 'manual' ? 'bg-white text-lilac-600 shadow-sm' : 'text-slate-500'}`}
                         >
-                          <PenLine size={15} />
-                          Manual
+                          <PenLine size={14} />
+                          <span className="hidden sm:inline">Manual</span>
+                          <span className="sm:hidden">Man.</span>
                         </button>
                       </div>
 
@@ -380,6 +470,59 @@ export function Purchases() {
                               </span>
                               <button
                                 onClick={handleAddInventoryItem}
+                                className="bg-lilac-500 text-white p-2.5 rounded-xl hover:bg-lilac-600 transition-colors"
+                              >
+                                <Plus size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Formulario de insumos */}
+                      {itemMode === 'supplies' && (
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <select
+                              value={selectedSupplyId}
+                              onChange={(e) => setSelectedSupplyId(e.target.value)}
+                              className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300 pr-8"
+                            >
+                              <option value="">— Seleccioná un insumo —</option>
+                              {supplies.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.emoji} {s.name} — {formatCurrency(s.unitCost)}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown
+                              size={15}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                            />
+                          </div>
+
+                          {supplies.find((s) => s.id === selectedSupplyId) && (
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 flex-1">
+                                <button
+                                  onClick={() => setSupplyQty((q) => Math.max(1, q - 1))}
+                                  className="text-slate-500 text-lg py-2"
+                                >
+                                  −
+                                </button>
+                                <span className="flex-1 text-center font-bold text-sm">{supplyQty}</span>
+                                <button
+                                  onClick={() => setSupplyQty((q) => q + 1)}
+                                  className="text-slate-500 text-lg py-2"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <span className="text-sm text-slate-500">
+                                = {formatCurrency(supplyQty * (supplies.find((s) => s.id === selectedSupplyId)?.unitCost ?? 0))}
+                              </span>
+                              <button
+                                onClick={handleAddSupplyItem}
                                 className="bg-lilac-500 text-white p-2.5 rounded-xl hover:bg-lilac-600 transition-colors"
                               >
                                 <Plus size={16} />

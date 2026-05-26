@@ -8,6 +8,7 @@ import type {
   SaleItem,
   PurchaseItem,
   Category,
+  Supply,
 } from './types'
 
 interface AppContextType {
@@ -15,6 +16,7 @@ interface AppContextType {
   sales: Sale[]
   purchases: Purchase[]
   accounting: AccountingEntry[]
+  supplies: Supply[]
   loading: boolean
   addProduct: (product: Omit<Product, 'id'>) => Promise<void>
   addSale: (
@@ -29,6 +31,9 @@ interface AppContextType {
   updateProductStock: (productId: string, newStock: number) => Promise<void>
   updateProduct: (productId: string, updates: Omit<Product, 'id'>) => Promise<void>
   deleteProduct: (productId: string) => Promise<void>
+  addSupply: (supply: Omit<Supply, 'id'>) => Promise<void>
+  updateSupply: (supplyId: string, updates: Omit<Supply, 'id'>) => Promise<void>
+  deleteSupply: (supplyId: string) => Promise<void>
 }
 
 // ── DB row → app type mappers ──────────────────────────────────────────────
@@ -97,6 +102,17 @@ function rowToAccounting(row: any): AccountingEntry {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToSupply(row: any): Supply {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    unitCost: row.unit_cost,
+    emoji: row.emoji,
+  }
+}
+
 // ── Context ────────────────────────────────────────────────────────────────
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -106,6 +122,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [sales, setSales] = useState<Sale[]>([])
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [accounting, setAccounting] = useState<AccountingEntry[]>([])
+  const [supplies, setSupplies] = useState<Supply[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -114,16 +131,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   async function loadAll() {
     setLoading(true)
-    const [productsRes, salesRes, purchasesRes, accountingRes] = await Promise.all([
+    const [productsRes, salesRes, purchasesRes, accountingRes, suppliesRes] = await Promise.all([
       supabase.from('products').select('*').order('created_at'),
       supabase.from('sales').select('*, sale_items(*)').order('date', { ascending: false }),
       supabase.from('purchases').select('*, purchase_items(*)').order('date', { ascending: false }),
       supabase.from('accounting_entries').select('*').order('date', { ascending: false }),
+      supabase.from('supplies').select('*').order('created_at'),
     ])
     if (productsRes.data) setProducts(productsRes.data.map(rowToProduct))
     if (salesRes.data) setSales(salesRes.data.map(rowToSale))
     if (purchasesRes.data) setPurchases(purchasesRes.data.map(rowToPurchase))
     if (accountingRes.data) setAccounting(accountingRes.data.map(rowToAccounting))
+    if (suppliesRes.data) setSupplies(suppliesRes.data.map(rowToSupply))
     setLoading(false)
   }
 
@@ -332,6 +351,50 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, stock: newStock } : p)))
   }
 
+  const addSupply = async (supply: Omit<Supply, 'id'>) => {
+    const { data } = await supabase
+      .from('supplies')
+      .insert({
+        name: supply.name,
+        category: supply.category,
+        unit_cost: supply.unitCost,
+        emoji: supply.emoji,
+      })
+      .select()
+      .single()
+    if (data) setSupplies((prev) => [...prev, rowToSupply(data)])
+  }
+
+  const updateSupply = async (supplyId: string, updates: Omit<Supply, 'id'>) => {
+    const { data, error } = await supabase
+      .from('supplies')
+      .update({
+        name: updates.name,
+        category: updates.category,
+        unit_cost: updates.unitCost,
+        emoji: updates.emoji,
+      })
+      .eq('id', supplyId)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    if (data) {
+      setSupplies((prev) => prev.map((s) => (s.id === supplyId ? rowToSupply(data) : s)))
+    } else {
+      setSupplies((prev) =>
+        prev.map((s) => (s.id === supplyId ? { id: supplyId, ...updates } : s)),
+      )
+    }
+  }
+
+  const deleteSupply = async (supplyId: string) => {
+    const { error } = await supabase.from('supplies').delete().eq('id', supplyId)
+    if (error) throw error
+    setSupplies((prev) => prev.filter((s) => s.id !== supplyId))
+  }
+
   return (
     <AppContext.Provider
       value={{
@@ -339,6 +402,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         sales,
         purchases,
         accounting,
+        supplies,
         loading,
         addProduct,
         addSale,
@@ -349,6 +413,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         updateProductStock,
         updateProduct,
         deleteProduct,
+        addSupply,
+        updateSupply,
+        deleteSupply,
       }}
     >
       {children}

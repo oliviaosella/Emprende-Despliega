@@ -1,5 +1,13 @@
 export type Category = string
 
+export interface Supply {
+  id: string
+  name: string
+  category: string
+  unitCost: number
+  emoji: string
+}
+
 export interface Product {
   id: string
   name: string

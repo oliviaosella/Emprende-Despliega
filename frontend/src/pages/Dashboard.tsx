@@ -23,9 +23,10 @@ import {
 
 interface DashboardProps {
   onOpenPedidos?: () => void
+  onReplenish?: (productId: string) => void
 }
 
-export function Dashboard({ onOpenPedidos }: DashboardProps) {
+export function Dashboard({ onOpenPedidos, onReplenish }: DashboardProps) {
   const { products, sales, accounting } = useAppContext()
   const [businessName, setBusinessName] = useState('tu emprendimiento')
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null)
@@ -318,9 +319,12 @@ export function Dashboard({ onOpenPedidos }: DashboardProps) {
                         </p>
                       </div>
                     </div>
-                    <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-1 rounded-lg">
+                    <button
+                      onClick={() => onReplenish?.(product.id)}
+                      className="bg-red-100 text-red-600 text-xs font-bold px-3 py-2 rounded-lg hover:bg-red-200 transition-colors"
+                    >
                       Reponer
-                    </span>
+                    </button>
                   </div>
                 ))}
               </div>
