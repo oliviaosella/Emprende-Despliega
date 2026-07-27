@@ -1,7 +1,6 @@
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAppContext } from '../AppContext'
-import { supabase } from '../lib/supabase'
 import {
   TrendingUp,
   AlertCircle,
@@ -27,18 +26,8 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onOpenPedidos, onReplenish }: DashboardProps) {
-  const { products, sales, accounting } = useAppContext()
-  const [businessName, setBusinessName] = useState('tu emprendimiento')
+  const { products, sales, accounting, businessName } = useAppContext()
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null)
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const empresa = user?.user_metadata?.empresa
-      if (empresa && typeof empresa === 'string') {
-        setBusinessName(empresa)
-      }
-    })
-  }, [])
 
   // Calculate metrics
   const today = new Date().toISOString().split('T')[0]
@@ -185,7 +174,7 @@ export function Dashboard({ onOpenPedidos, onReplenish }: DashboardProps) {
     <div className="p-6">
       <div className="mb-8">
         <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">
-          Buenas tardes, {businessName}!
+          Buenas tardes, {businessName || 'tu emprendimiento'}!
         </h1>
         <p className="text-slate-500">
           Aquí está el resumen de tu emprendimiento.

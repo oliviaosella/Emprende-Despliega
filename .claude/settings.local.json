@@ -3,7 +3,18 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(npm run *)",
-      "Bash(chromium-cli *)"
+      "Bash(chromium-cli *)",
+      "mcp__claude_ai_Supabase__get_logs",
+      "mcp__274d9dcd-8636-4c2d-92b9-4680d90eb79a__list_projects",
+      "mcp__274d9dcd-8636-4c2d-92b9-4680d90eb79a__list_tables",
+      "mcp__274d9dcd-8636-4c2d-92b9-4680d90eb79a__apply_migration",
+      "Bash(npx eslint *)",
+      "mcp__274d9dcd-8636-4c2d-92b9-4680d90eb79a__execute_sql",
+      "Bash(grep -n \"filteredSupplies.length === 0\\\\|^        </div>$\" /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/frontend/src/pages/Supplies.tsx)",
+      "Bash(grep -n \"const { purchases, products, supplies, addPurchase }\\\\|Header\\\\|Lista de compras\\\\|grid grid-cols\" /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/frontend/src/pages/Purchases.tsx)",
+      "Bash(grep -n \"bomItems,\\\\|value={{\" /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/frontend/src/AppContext.tsx)",
+      "Bash(mkdir -p /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/.claude/skills/continuar-proyecto)",
+      "Bash(grep -n \"Unidad de medida \\\\*\\\\|Costo vigente \\\\*\\\\|Activo$\\\\|form.active\" /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/frontend/src/pages/Supplies.tsx)"
     ]
   }
 }

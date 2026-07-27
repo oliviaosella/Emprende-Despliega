@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { User, Lock, LogOut, Save, Eye, EyeOff, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/Toast'
+import { useAppContext } from '../AppContext'
 
 interface ProfileData {
   email: string
@@ -10,6 +12,8 @@ interface ProfileData {
 }
 
 export function Profile() {
+  const { showToast } = useToast()
+  const { setBusinessName } = useAppContext()
   const [profile, setProfile] = useState<ProfileData>({
     email: '',
     nombre: '',
@@ -46,7 +50,7 @@ export function Profile() {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    await supabase.auth.updateUser({
+    const { error } = await supabase.auth.updateUser({
       data: {
         nombre: profile.nombre,
         empresa: profile.empresa,
@@ -54,8 +58,14 @@ export function Profile() {
       },
     })
     setSaving(false)
+    if (error) {
+      showToast('No se pudo actualizar el perfil.', 'error')
+      return
+    }
+    setBusinessName(profile.empresa)
     setSaveSuccess(true)
     setTimeout(() => setSaveSuccess(false), 3000)
+    showToast('Perfil actualizado correctamente.')
   }
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -92,12 +102,14 @@ export function Profile() {
 
     if (updateError) {
       setPwError('Error al cambiar la contraseña. Intentá de nuevo.')
+      showToast('No se pudo cambiar la contraseña.', 'error')
     } else {
       setPwSuccess(true)
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => setPwSuccess(false), 4000)
+      showToast('Contraseña actualizada correctamente.')
     }
   }
 

@@ -3,13 +3,14 @@ import { Sparkles, User } from 'lucide-react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { AppProvider, useAppContext } from './AppContext'
+import { ToastProvider } from './components/Toast'
+import { ViewModeProvider } from './components/ViewModeContext'
 import { BottomNav, type TabType } from './components/BottomNav'
 import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './pages/Dashboard'
 import { Inventory } from './pages/Inventory'
 import { Sales, type ViewTab } from './pages/Sales'
 import { Purchases } from './pages/Purchases'
-import { Supplies } from './pages/Supplies'
 import { Accounting } from './pages/Accounting'
 import { Profile } from './pages/Profile'
 import { Login } from './pages/Login'
@@ -91,7 +92,6 @@ function AppContent() {
                   onProductSelected={() => setReplenishmentProductId(null)}
                 />
               )}
-              {activeTab === 'supplies' && <Supplies />}
               {activeTab === 'accounting' && <Accounting />}
               {activeTab === 'profile' && <Profile />}
             </motion.div>
@@ -131,11 +131,17 @@ export function App() {
     )
   }
 
-  if (!session) return <Login />
-
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <ToastProvider>
+      <ViewModeProvider>
+        {!session ? (
+          <Login />
+        ) : (
+          <AppProvider>
+            <AppContent />
+          </AppProvider>
+        )}
+      </ViewModeProvider>
+    </ToastProvider>
   )
 }

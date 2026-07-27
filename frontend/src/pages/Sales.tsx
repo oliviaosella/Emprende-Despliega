@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SaleItem, Product } from '../types'
+import { useViewMode } from '../components/ViewModeContext'
+import { ViewToggle } from '../components/ViewToggle'
 
 export type ViewTab = 'vender' | 'pedidos' | 'historial'
 
@@ -24,6 +26,7 @@ interface SalesProps {
 
 export function Sales({ forcedView, onForcedViewApplied }: SalesProps) {
   const { products, sales, addSale, completePedido, updatePedidoStatus } = useAppContext()
+  const { viewMode } = useViewMode()
 
   const [view, setView] = useState<ViewTab>('vender')
   const [cart, setCart] = useState<SaleItem[]>([])
@@ -339,96 +342,141 @@ export function Sales({ forcedView, onForcedViewApplied }: SalesProps) {
 
         {/* ── PEDIDOS ── */}
         {view === 'pedidos' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pedidos.map((pedido) => {
-              const mainProduct = products.find((p) => p.id === pedido.items[0]?.productId)
-              const statusColor =
-                pedido.pedidoStatus === 'pendiente'
-                  ? 'border-l-yellow-400'
-                  : pedido.pedidoStatus === 'en_progreso'
-                    ? 'border-l-blue-400'
-                    : 'border-l-green-400'
-              return (
-                <motion.div
-                  key={pedido.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm border-l-4 ${statusColor}`}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="text-3xl bg-slate-50 p-2 rounded-xl">
+          <div>
+            <div className="flex justify-end mb-4">
+              <ViewToggle />
+            </div>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'flex flex-col gap-2'}>
+              {pedidos.map((pedido) => {
+                const mainProduct = products.find((p) => p.id === pedido.items[0]?.productId)
+                const statusColor =
+                  pedido.pedidoStatus === 'pendiente'
+                    ? 'border-l-yellow-400'
+                    : pedido.pedidoStatus === 'en_progreso'
+                      ? 'border-l-blue-400'
+                      : 'border-l-green-400'
+
+                const actionButton =
+                  pedido.pedidoStatus === 'pendiente' ? (
+                    <button
+                      onClick={() => updatePedidoStatus(pedido.id, 'en_progreso')}
+                      className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors shrink-0"
+                    >
+                      <PlayCircle size={14} /> Iniciar
+                    </button>
+                  ) : pedido.pedidoStatus === 'en_progreso' ? (
+                    <button
+                      onClick={async () => {
+                        await completePedido(pedido.id)
+                        setToastMessage('Venta de pedido registrada!')
+                        setShowSuccess(true)
+                        setTimeout(() => setShowSuccess(false), 2500)
+                      }}
+                      className="flex items-center gap-1 bg-green-50 text-green-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-100 transition-colors shrink-0"
+                    >
+                      <CheckCircle2 size={14} /> Completar
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-1 text-green-500 text-xs font-bold px-3 py-1.5 shrink-0">
+                      <CheckCircle2 size={14} /> Listo
+                    </span>
+                  )
+
+                if (viewMode === 'list') {
+                  return (
+                    <motion.div
+                      key={pedido.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className={`bg-white rounded-xl px-3 py-2.5 border border-slate-100 shadow-sm border-l-4 flex items-center gap-3 ${statusColor}`}
+                    >
+                      <div className="text-xl bg-slate-50 p-2 rounded-lg shrink-0">
                         {mainProduct?.emoji ?? '📦'}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-sm">
-                          {mainProduct?.name ?? 'Pedido'}{pedido.items.length > 1 && ` +${pedido.items.length - 1}`}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-slate-800 text-sm truncate">
+                          {mainProduct?.name ?? 'Pedido'}
+                          {pedido.items.length > 1 && ` +${pedido.items.length - 1}`}
                         </h3>
-                        <p className={`text-xs flex items-center gap-1 mt-1 ${getDeadlineColor(pedido.pedidoDeadline, pedido.pedidoStatus)}`}>
-                          <CalendarClock size={12} />
-                          Entrega: {pedido.pedidoDeadline
-                            ? formatDateShort(pedido.pedidoDeadline)
-                            : 'Sin fecha'}
+                        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border shrink-0 ${getStatusBadge(pedido.pedidoStatus)}`}
+                          >
+                            {getStatusLabel(pedido.pedidoStatus)}
+                          </span>
+                          <span
+                            className={`text-xs flex items-center gap-1 whitespace-nowrap ${getDeadlineColor(pedido.pedidoDeadline, pedido.pedidoStatus)}`}
+                          >
+                            <CalendarClock size={12} />
+                            {pedido.pedidoDeadline ? formatDateShort(pedido.pedidoDeadline) : 'Sin fecha'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <p className="font-bold text-slate-800 text-sm">
+                          {formatCurrency(pedido.total)}
                         </p>
+                        {actionButton}
+                      </div>
+                    </motion.div>
+                  )
+                }
+
+                return (
+                  <motion.div
+                    key={pedido.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm border-l-4 ${statusColor}`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="text-3xl bg-slate-50 p-2 rounded-xl">
+                          {mainProduct?.emoji ?? '📦'}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-800 text-sm">
+                            {mainProduct?.name ?? 'Pedido'}{pedido.items.length > 1 && ` +${pedido.items.length - 1}`}
+                          </h3>
+                          <p className={`text-xs flex items-center gap-1 mt-1 ${getDeadlineColor(pedido.pedidoDeadline, pedido.pedidoStatus)}`}>
+                            <CalendarClock size={12} />
+                            Entrega: {pedido.pedidoDeadline
+                              ? formatDateShort(pedido.pedidoDeadline)
+                              : 'Sin fecha'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${getStatusBadge(pedido.pedidoStatus)}`}>
+                        {getStatusLabel(pedido.pedidoStatus)}
                       </div>
                     </div>
-                    <div className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${getStatusBadge(pedido.pedidoStatus)}`}>
-                      {getStatusLabel(pedido.pedidoStatus)}
-                    </div>
-                  </div>
 
-                  {pedido.pedidoDescription && (
-                    <div className="bg-slate-50 p-3 rounded-xl mb-3">
-                      <p className="text-xs text-slate-600 italic leading-relaxed">
-                        "{pedido.pedidoDescription}"
-                      </p>
-                    </div>
-                  )}
+                    {pedido.pedidoDescription && (
+                      <div className="bg-slate-50 p-3 rounded-xl mb-3">
+                        <p className="text-xs text-slate-600 italic leading-relaxed">
+                          "{pedido.pedidoDescription}"
+                        </p>
+                      </div>
+                    )}
 
-                  <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                    <div>
-                      <p className="text-xs text-slate-400">Total ({pedido.paymentMethod})</p>
-                      <p className="font-bold text-slate-800">{formatCurrency(pedido.total)}</p>
+                    <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                      <div>
+                        <p className="text-xs text-slate-400">Total ({pedido.paymentMethod})</p>
+                        <p className="font-bold text-slate-800">{formatCurrency(pedido.total)}</p>
+                      </div>
+                      <div className="flex gap-2">{actionButton}</div>
                     </div>
-                    <div className="flex gap-2">
-                      {pedido.pedidoStatus === 'pendiente' && (
-                        <button
-                          onClick={() => updatePedidoStatus(pedido.id, 'en_progreso')}
-                          className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
-                        >
-                          <PlayCircle size={14} /> Iniciar
-                        </button>
-                      )}
-                      {pedido.pedidoStatus === 'en_progreso' && (
-                        <button
-                          onClick={async () => {
-                            await completePedido(pedido.id)
-                            setToastMessage('Venta de pedido registrada!')
-                            setShowSuccess(true)
-                            setTimeout(() => setShowSuccess(false), 2500)
-                          }}
-                          className="flex items-center gap-1 bg-green-50 text-green-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-100 transition-colors"
-                        >
-                          <CheckCircle2 size={14} /> Completar
-                        </button>
-                      )}
-                      {pedido.pedidoStatus === 'completado' && (
-                        <span className="flex items-center gap-1 text-green-500 text-xs font-bold px-3 py-1.5">
-                          <CheckCircle2 size={14} /> Listo
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              )
-            })}
-            {pedidos.length === 0 && (
-              <div className="col-span-full text-center py-12 text-slate-400">
-                <PackageSearch size={48} className="mx-auto mb-4 opacity-20" />
-                <p className="font-medium">No hay pedidos registrados.</p>
-                <p className="text-sm mt-1">Los pedidos aparecen aquí al registrar una venta como pedido.</p>
-              </div>
-            )}
+                  </motion.div>
+                )
+              })}
+              {pedidos.length === 0 && (
+                <div className="col-span-full text-center py-12 text-slate-400">
+                  <PackageSearch size={48} className="mx-auto mb-4 opacity-20" />
+                  <p className="font-medium">No hay pedidos registrados.</p>
+                  <p className="text-sm mt-1">Los pedidos aparecen aquí al registrar una venta como pedido.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

@@ -4,7 +4,6 @@ import {
   ShoppingCart,
   Truck,
   Calculator,
-  Boxes,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
@@ -14,7 +13,6 @@ export type TabType =
   | 'sales'
   | 'purchases'
   | 'accounting'
-  | 'supplies'
   | 'profile'
 
 interface BottomNavProps {
@@ -43,11 +41,6 @@ export function BottomNav({ activeTab, onChangeTab }: BottomNavProps) {
       id: 'purchases',
       label: 'Compras',
       icon: Truck,
-    },
-    {
-      id: 'supplies',
-      label: 'Insumos',
-      icon: Boxes,
     },
     {
       id: 'accounting',

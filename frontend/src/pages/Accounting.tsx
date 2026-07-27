@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { useAppContext } from '../AppContext'
 import { ArrowUpRight, ArrowDownRight, Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useViewMode } from '../components/ViewModeContext'
+import { ViewToggle } from '../components/ViewToggle'
 
 export function Accounting() {
   const { accounting } = useAppContext()
+  const { viewMode } = useViewMode()
   const [filter, setFilter] = useState<'todos' | 'ingreso' | 'egreso'>('todos')
 
   const formatCurrency = (amount: number) => {
@@ -73,19 +76,22 @@ export function Accounting() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 lg:p-6 pb-32 lg:pb-6">
-        <div className="flex gap-2 mb-4">
-          {(['todos', 'ingreso', 'egreso'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${filter === f ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
-            >
-              {f}
-            </button>
-          ))}
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex gap-2">
+            {(['todos', 'ingreso', 'egreso'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${filter === f ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+          <ViewToggle />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : 'flex flex-col gap-2'}>
           {filteredEntries.map((entry) => (
             <motion.div
               key={entry.id}
