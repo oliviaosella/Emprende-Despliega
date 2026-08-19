@@ -12,13 +12,18 @@ import {
   Boxes,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { PurchaseItem } from '../types'
+import type { PurchaseItem, UnitOfMeasure, Category } from '../types'
+import { UNITS_OF_MEASURE } from '../types'
 import { useViewMode } from '../components/ViewModeContext'
 import { ViewToggle } from '../components/ViewToggle'
+import { SearchableSelect } from '../components/SearchableSelect'
+import { PurchaseSuppliers } from './PurchaseSuppliers'
 
 // ── Tipos locales del formulario ───────────────────────────────────────────
 
 type ItemMode = 'inventory' | 'supplies' | 'manual'
+type ManualMode = 'product' | 'supply'
+type ComprasTab = 'compras' | 'proveedores'
 
 interface CartItem {
   mode: ItemMode
@@ -27,6 +32,26 @@ interface CartItem {
   name: string
   qty: number
   unitCost: number
+}
+
+// ── Categorías (misma fuente que Inventario) ────────────────────────────────
+
+const CATEGORY_STORAGE_KEY = 'miniEmprende.categories'
+const DEFAULT_CATEGORIES: Category[] = ['Cuadernos', 'Arte', 'Papelería', 'Accesorios']
+
+const readCategories = (): Category[] => {
+  if (typeof window === 'undefined') return DEFAULT_CATEGORIES
+  const stored = window.localStorage.getItem(CATEGORY_STORAGE_KEY)
+  if (!stored) return DEFAULT_CATEGORIES
+  try {
+    const parsed = JSON.parse(stored)
+    if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) {
+      return parsed as Category[]
+    }
+  } catch {
+    return DEFAULT_CATEGORIES
+  }
+  return DEFAULT_CATEGORIES
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -45,12 +70,24 @@ interface PurchasesProps {
   onProductSelected?: () => void
 }
 
-export function Purchases({ preselectedProductId, onProductSelected }: PurchasesProps) {
-  const { purchases, products, supplies, addPurchase } = useAppContext()
+function ComprasPanel({ preselectedProductId, onProductSelected }: PurchasesProps) {
+  const {
+    purchases,
+    products,
+    supplies,
+    supplyTypes,
+    purchaseSuppliers,
+    addPurchase,
+    addProduct,
+    addSupply,
+    addPurchaseSupplier,
+  } = useAppContext()
   const { viewMode } = useViewMode()
 
+  const [categories] = useState<Category[]>(readCategories)
+
   const [showForm, setShowForm] = useState(false)
-  const [supplier, setSupplier] = useState('')
+  const [selectedSupplierId, setSelectedSupplierId] = useState('')
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [itemMode, setItemMode] = useState<ItemMode>('inventory')
 
@@ -63,10 +100,21 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
   const [supplyQty, setSupplyQty] = useState(1)
   const [supplyUnitCost, setSupplyUnitCost] = useState('')
 
-  // Estado para item manual
+  // Estado para item manual (alta de producto o insumo nuevo)
+  const [manualMode, setManualMode] = useState<ManualMode>('product')
   const [manualName, setManualName] = useState('')
   const [manualQty, setManualQty] = useState(1)
   const [manualPrice, setManualPrice] = useState('')
+  const [manualCategory, setManualCategory] = useState('')
+  const [manualSalePrice, setManualSalePrice] = useState('')
+  const [manualSupplyTypeId, setManualSupplyTypeId] = useState('')
+  const [manualUnit, setManualUnit] = useState<UnitOfMeasure>(UNITS_OF_MEASURE[0])
+  const [manualSaving, setManualSaving] = useState(false)
+
+  // Estado del proveedor (alta rápida dentro de Nueva Compra)
+  const [showQuickAddSupplier, setShowQuickAddSupplier] = useState(false)
+  const [quickSupplierName, setQuickSupplierName] = useState('')
+  const [quickSupplierSaving, setQuickSupplierSaving] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [successRef, setSuccessRef] = useState<string | null>(null)
@@ -140,30 +188,98 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
     setSupplyUnitCost('')
   }
 
-  const handleAddManualItem = () => {
-    if (!manualName.trim() || !manualPrice || manualQty < 1) return
-    setCartItems((prev) => [
-      ...prev,
-      {
-        mode: 'manual',
-        name: manualName.trim(),
-        qty: manualQty,
-        unitCost: Number(manualPrice),
-      },
-    ])
+  const resetManualForm = () => {
     setManualName('')
     setManualQty(1)
     setManualPrice('')
+    setManualCategory('')
+    setManualSalePrice('')
+    setManualSupplyTypeId('')
+    setManualUnit(UNITS_OF_MEASURE[0])
+  }
+
+  const handleAddManualItem = async () => {
+    if (!manualName.trim() || !manualPrice || manualQty < 1) return
+    setManualSaving(true)
+    try {
+      if (manualMode === 'product') {
+        if (!manualCategory || !manualSalePrice) return
+        const newProduct = await addProduct({
+          name: manualName.trim(),
+          category: manualCategory,
+          productType: 'reventa',
+          costPrice: Number(manualPrice),
+          salePrice: Number(manualSalePrice),
+          stock: 0,
+          minStock: 5,
+          emoji: '📦',
+        })
+        if (!newProduct) return
+        setCartItems((prev) => [
+          ...prev,
+          {
+            mode: 'inventory',
+            productId: newProduct.id,
+            name: `${newProduct.emoji} ${newProduct.name}`,
+            qty: manualQty,
+            unitCost: Number(manualPrice),
+          },
+        ])
+      } else {
+        if (!manualSupplyTypeId) return
+        const newSupply = await addSupply({
+          name: manualName.trim(),
+          supplyTypeId: manualSupplyTypeId,
+          unit: manualUnit,
+          unitCost: Number(manualPrice),
+          active: true,
+          emoji: '📋',
+        })
+        if (!newSupply) return
+        setCartItems((prev) => [
+          ...prev,
+          {
+            mode: 'supplies',
+            supplyId: newSupply.id,
+            name: `${newSupply.emoji} ${newSupply.name}`,
+            qty: manualQty,
+            unitCost: Number(manualPrice),
+          },
+        ])
+      }
+      resetManualForm()
+    } finally {
+      setManualSaving(false)
+    }
   }
 
   const removeItem = (idx: number) =>
     setCartItems((prev) => prev.filter((_, i) => i !== idx))
 
+  // ── Proveedor: alta rápida dentro de Nueva Compra ─────────────────────────
+
+  const handleQuickAddSupplier = async () => {
+    if (!quickSupplierName.trim()) return
+    setQuickSupplierSaving(true)
+    try {
+      const created = await addPurchaseSupplier({ name: quickSupplierName.trim() })
+      if (created) {
+        setSelectedSupplierId(created.id)
+        setQuickSupplierName('')
+        setShowQuickAddSupplier(false)
+      }
+    } finally {
+      setQuickSupplierSaving(false)
+    }
+  }
+
   // ── Confirmar compra ─────────────────────────────────────────────────────
+
+  const selectedSupplier = purchaseSuppliers.find((s) => s.id === selectedSupplierId)
 
   const validate = () => {
     const errs: string[] = []
-    if (!supplier.trim()) errs.push('Ingresá el nombre del proveedor.')
+    if (!selectedSupplierId) errs.push('Elegí o creá un proveedor.')
     if (cartItems.length === 0) errs.push('Agregá al menos un artículo.')
     return errs
   }
@@ -180,12 +296,11 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
     const items: PurchaseItem[] = cartItems.map((i) => ({
       productId: i.productId,
       supplyId: i.supplyId,
-      customName: i.mode === 'manual' ? i.name : undefined,
       qty: i.qty,
       unitCost: i.unitCost,
     }))
 
-    await addPurchase(supplier.trim(), items)
+    await addPurchase(selectedSupplier?.name ?? '', items)
 
     const ref = `C-${Date.now().toString().slice(-6)}`
     setSuccessRef(ref)
@@ -195,7 +310,9 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
   const handleClose = () => {
     setShowForm(false)
     setSuccessRef(null)
-    setSupplier('')
+    setSelectedSupplierId('')
+    setShowQuickAddSupplier(false)
+    setQuickSupplierName('')
     setCartItems([])
     setErrors([])
     setItemMode('inventory')
@@ -204,9 +321,8 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
     setSelectedSupplyId('')
     setSupplyQty(1)
     setSupplyUnitCost('')
-    setManualName('')
-    setManualQty(1)
-    setManualPrice('')
+    setManualMode('product')
+    resetManualForm()
   }
 
   // ── Nombre de producto para mostrar en historial ─────────────────────────
@@ -224,22 +340,22 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="bg-white p-6 pb-4 rounded-b-3xl shadow-sm border-b border-lilac-50 z-10">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Compras</h1>
-          <div className="flex items-center gap-2">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Toolbar */}
+      <div className="bg-white border-b border-slate-100 px-4 lg:px-6 py-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-slate-500 text-sm">Registro de insumos y mercadería</p>
+          <div className="flex items-center gap-2 shrink-0">
             <ViewToggle />
             <button
               onClick={() => setShowForm(true)}
               className="bg-lilac-100 text-lilac-600 p-2 rounded-xl hover:bg-lilac-200 transition-colors"
+              title="Nueva compra"
             >
               <Plus size={20} />
             </button>
           </div>
         </div>
-        <p className="text-slate-500 text-sm mt-1">Registro de insumos y mercadería</p>
       </div>
 
       {/* Lista de compras */}
@@ -445,13 +561,52 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
                       <label className="block text-xs font-medium text-slate-500 mb-1">
                         Proveedor *
                       </label>
-                      <input
-                        type="text"
-                        value={supplier}
-                        onChange={(e) => setSupplier(e.target.value)}
-                        placeholder="Nombre del proveedor"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
-                      />
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <select
+                            value={selectedSupplierId}
+                            onChange={(e) => setSelectedSupplierId(e.target.value)}
+                            className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300 pr-8"
+                          >
+                            <option value="">— Seleccioná un proveedor —</option>
+                            {purchaseSuppliers.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown
+                            size={15}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                          />
+                        </div>
+                        <button
+                          onClick={() => setShowQuickAddSupplier((v) => !v)}
+                          className="bg-slate-100 text-slate-500 p-2.5 rounded-xl hover:bg-slate-200 transition-colors shrink-0"
+                          title="Nuevo proveedor"
+                        >
+                          <Plus size={18} />
+                        </button>
+                      </div>
+
+                      {showQuickAddSupplier && (
+                        <div className="flex gap-2 mt-2">
+                          <input
+                            type="text"
+                            value={quickSupplierName}
+                            onChange={(e) => setQuickSupplierName(e.target.value)}
+                            placeholder="Nombre del proveedor"
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                          />
+                          <button
+                            onClick={handleQuickAddSupplier}
+                            disabled={quickSupplierSaving || !quickSupplierName.trim()}
+                            className="bg-lilac-500 text-white px-4 rounded-xl font-medium hover:bg-lilac-600 transition-colors disabled:opacity-50"
+                          >
+                            {quickSupplierSaving ? '...' : 'Agregar'}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Toggle modo de item */}
@@ -489,24 +644,17 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
                       {/* Formulario del inventario */}
                       {itemMode === 'inventory' && (
                         <div className="space-y-2">
-                          <div className="relative">
-                            <select
-                              value={selectedProductId}
-                              onChange={(e) => setSelectedProductId(e.target.value)}
-                              className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300 pr-8"
-                            >
-                              <option value="">— Seleccioná un producto —</option>
-                              {products.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.emoji} {p.name} — costo {formatCurrency(p.costPrice)}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown
-                              size={15}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                            />
-                          </div>
+                          <SearchableSelect
+                            value={selectedProductId}
+                            onChange={setSelectedProductId}
+                            placeholder="Buscar producto..."
+                            emptyMessage="No se encontraron productos."
+                            options={products.map((p) => ({
+                              value: p.id,
+                              label: `${p.emoji} ${p.name} — costo ${formatCurrency(p.costPrice)}`,
+                              searchText: p.name,
+                            }))}
+                          />
 
                           {selectedProduct && (
                             <div className="flex items-center gap-2">
@@ -612,16 +760,85 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
                         </div>
                       )}
 
-                      {/* Formulario manual */}
+                      {/* Formulario manual: crea un producto o un insumo nuevo */}
                       {itemMode === 'manual' && (
                         <div className="space-y-2">
+                          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+                            <button
+                              onClick={() => setManualMode('product')}
+                              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors ${manualMode === 'product' ? 'bg-white text-lilac-600 shadow-sm' : 'text-slate-500'}`}
+                            >
+                              <Package size={14} />
+                              Producto nuevo
+                            </button>
+                            <button
+                              onClick={() => setManualMode('supply')}
+                              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors ${manualMode === 'supply' ? 'bg-white text-lilac-600 shadow-sm' : 'text-slate-500'}`}
+                            >
+                              <Boxes size={14} />
+                              Insumo nuevo
+                            </button>
+                          </div>
+
                           <input
                             type="text"
                             value={manualName}
                             onChange={(e) => setManualName(e.target.value)}
-                            placeholder="Nombre del artículo"
+                            placeholder={manualMode === 'product' ? 'Nombre del producto' : 'Nombre del insumo'}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
                           />
+
+                          {manualMode === 'product' ? (
+                            <div className="flex gap-2">
+                              <select
+                                value={manualCategory}
+                                onChange={(e) => setManualCategory(e.target.value)}
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                              >
+                                <option value="">— Categoría —</option>
+                                {categories.map((c) => (
+                                  <option key={c} value={c}>
+                                    {c}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                type="number"
+                                value={manualSalePrice}
+                                onChange={(e) => setManualSalePrice(e.target.value)}
+                                placeholder="Precio venta"
+                                min="0"
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <select
+                                value={manualSupplyTypeId}
+                                onChange={(e) => setManualSupplyTypeId(e.target.value)}
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                              >
+                                <option value="">— Tipo de insumo —</option>
+                                {supplyTypes.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={manualUnit}
+                                onChange={(e) => setManualUnit(e.target.value as UnitOfMeasure)}
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300"
+                              >
+                                {UNITS_OF_MEASURE.map((u) => (
+                                  <option key={u} value={u}>
+                                    {u}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
                           <div className="flex gap-2">
                             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 flex-1">
                               <button
@@ -642,13 +859,18 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
                               type="number"
                               value={manualPrice}
                               onChange={(e) => setManualPrice(e.target.value)}
-                              placeholder="Precio unit."
+                              placeholder="Costo compra"
                               min="0"
                               className="bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-lilac-300 w-32"
                             />
                             <button
                               onClick={handleAddManualItem}
-                              disabled={!manualName.trim() || !manualPrice}
+                              disabled={
+                                manualSaving ||
+                                !manualName.trim() ||
+                                !manualPrice ||
+                                (manualMode === 'product' ? !manualCategory || !manualSalePrice : !manualSupplyTypeId)
+                              }
                               className="bg-lilac-500 text-white p-2.5 rounded-xl hover:bg-lilac-600 transition-colors disabled:opacity-40"
                             >
                               <Plus size={16} />
@@ -708,7 +930,7 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
                     </button>
                     <button
                       onClick={handleConfirm}
-                      disabled={saving || cartItems.length === 0 || !supplier.trim()}
+                      disabled={saving || cartItems.length === 0 || !selectedSupplierId}
                       className="flex-2 flex-1 bg-lilac-500 text-white py-3 rounded-2xl font-semibold hover:bg-lilac-600 transition-colors disabled:opacity-50"
                     >
                       {saving ? 'Guardando...' : 'Confirmar Compra'}
@@ -720,6 +942,46 @@ export function Purchases({ preselectedProductId, onProductSelected }: Purchases
           </motion.div>
         )}
       </AnimatePresence>
+
+    </div>
+  )
+}
+
+export function Purchases({ preselectedProductId, onProductSelected }: PurchasesProps) {
+  const [tab, setTab] = useState<ComprasTab>('compras')
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="bg-white p-6 pb-4 rounded-b-3xl shadow-sm border-b border-lilac-50 z-10">
+        <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 mb-4">Compras</h1>
+        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+          <button
+            onClick={() => setTab('compras')}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'compras' ? 'bg-white text-lilac-600 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            Historial
+          </button>
+          <button
+            onClick={() => setTab('proveedores')}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'proveedores' ? 'bg-white text-lilac-600 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            Proveedores
+          </button>
+        </div>
+      </div>
+
+      {tab === 'compras' ? (
+        <ComprasPanel
+          preselectedProductId={preselectedProductId}
+          onProductSelected={onProductSelected}
+        />
+      ) : (
+        <PurchaseSuppliers />
+      )}
     </div>
   )
 }

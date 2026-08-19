@@ -21,7 +21,7 @@ export function InfoTooltip({ text }: InfoTooltipProps) {
         <Info size={13} />
       </button>
       {show && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-max max-w-[200px] bg-slate-800 text-white text-[11px] leading-snug px-2.5 py-1.5 rounded-lg shadow-lg z-50 pointer-events-none">
+        <span className="absolute bottom-full left-0 mb-1.5 w-max max-w-[200px] bg-slate-800 text-white text-[11px] leading-snug px-2.5 py-1.5 rounded-lg shadow-lg z-50 pointer-events-none">
           {text}
         </span>
       )}

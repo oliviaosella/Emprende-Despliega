@@ -13,6 +13,7 @@ import type {
   SupplyType,
   SupplyCostHistoryEntry,
   BomItem,
+  PurchaseSupplier,
 } from './types'
 
 interface AppContextType {
@@ -24,10 +25,11 @@ interface AppContextType {
   supplyTypes: SupplyType[]
   supplyCostHistory: SupplyCostHistoryEntry[]
   bomItems: BomItem[]
+  purchaseSuppliers: PurchaseSupplier[]
   businessName: string
   setBusinessName: (name: string) => void
   loading: boolean
-  addProduct: (product: Omit<Product, 'id'>) => Promise<void>
+  addProduct: (product: Omit<Product, 'id'>) => Promise<Product | undefined>
   addSale: (
     items: SaleItem[],
     paymentMethod: Sale['paymentMethod'],
@@ -40,7 +42,7 @@ interface AppContextType {
   updateProductStock: (productId: string, newStock: number) => Promise<void>
   updateProduct: (productId: string, updates: Omit<Product, 'id'>) => Promise<void>
   deleteProduct: (productId: string) => Promise<void>
-  addSupply: (supply: Omit<Supply, 'id'>) => Promise<void>
+  addSupply: (supply: Omit<Supply, 'id'>) => Promise<Supply | undefined>
   updateSupply: (supplyId: string, updates: Omit<Supply, 'id'>) => Promise<void>
   deleteSupply: (supplyId: string) => Promise<void>
   addSupplyType: (name: string) => Promise<void>
@@ -49,6 +51,9 @@ interface AppContextType {
   addBomItem: (productId: string, supplyId: string, quantity: number) => Promise<void>
   updateBomItem: (bomItemId: string, quantity: number) => Promise<void>
   deleteBomItem: (bomItemId: string) => Promise<void>
+  addPurchaseSupplier: (supplier: Omit<PurchaseSupplier, 'id'>) => Promise<PurchaseSupplier | undefined>
+  updatePurchaseSupplier: (supplierId: string, updates: Omit<PurchaseSupplier, 'id'>) => Promise<void>
+  deletePurchaseSupplier: (supplierId: string) => Promise<void>
 }
 
 // ── DB row → app type mappers ──────────────────────────────────────────────
@@ -163,6 +168,16 @@ function rowToBomItem(row: any): BomItem {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToPurchaseSupplier(row: any): PurchaseSupplier {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone ?? undefined,
+    email: row.email ?? undefined,
+  }
+}
+
 // ── Context ────────────────────────────────────────────────────────────────
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -176,6 +191,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [supplyTypes, setSupplyTypes] = useState<SupplyType[]>([])
   const [supplyCostHistory, setSupplyCostHistory] = useState<SupplyCostHistoryEntry[]>([])
   const [bomItems, setBomItems] = useState<BomItem[]>([])
+  const [purchaseSuppliers, setPurchaseSuppliers] = useState<PurchaseSupplier[]>([])
   const [businessName, setBusinessName] = useState('')
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
@@ -201,6 +217,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       supplyTypesRes,
       supplyCostHistoryRes,
       bomItemsRes,
+      purchaseSuppliersRes,
     ] = await Promise.all([
       supabase.from('products').select('*').order('created_at'),
       supabase.from('sales').select('*, sale_items(*)').order('date', { ascending: false }),
@@ -213,6 +230,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       supabase.from('supply_types').select('*').order('name'),
       supabase.from('supply_cost_history').select('*').order('date', { ascending: false }),
       supabase.from('product_bom_items').select('*').order('created_at'),
+      supabase.from('purchase_suppliers').select('*').order('name'),
     ])
     if (productsRes.data) setProducts(productsRes.data.map(rowToProduct))
     if (salesRes.data) setSales(salesRes.data.map(rowToSale))
@@ -223,6 +241,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (supplyCostHistoryRes.data)
       setSupplyCostHistory(supplyCostHistoryRes.data.map(rowToSupplyCostHistory))
     if (bomItemsRes.data) setBomItems(bomItemsRes.data.map(rowToBomItem))
+    if (purchaseSuppliersRes.data)
+      setPurchaseSuppliers(purchaseSuppliersRes.data.map(rowToPurchaseSupplier))
     setLoading(false)
   }
 
@@ -243,10 +263,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .single()
     if (error) {
       showToast('No se pudo crear el producto.', 'error')
-      return
+      return undefined
     }
-    setProducts((prev) => [...prev, rowToProduct(data)])
+    const newProduct = rowToProduct(data)
+    setProducts((prev) => [...prev, newProduct])
     showToast('Producto creado correctamente.')
+    return newProduct
   }
 
   const updateProduct = async (productId: string, updates: Omit<Product, 'id'>) => {
@@ -592,10 +614,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .single()
     if (error) {
       showToast('No se pudo crear el insumo.', 'error')
-      return
+      return undefined
     }
-    setSupplies((prev) => [...prev, rowToSupply(data)])
+    const newSupply = rowToSupply(data)
+    setSupplies((prev) => [...prev, newSupply])
     showToast('Insumo creado correctamente.')
+    return newSupply
   }
 
   const updateSupply = async (supplyId: string, updates: Omit<Supply, 'id'>) => {
@@ -688,6 +712,64 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     showToast('Tipo de insumo eliminado correctamente.')
   }
 
+  const addPurchaseSupplier = async (supplier: Omit<PurchaseSupplier, 'id'>) => {
+    const { data, error } = await supabase
+      .from('purchase_suppliers')
+      .insert({
+        name: supplier.name,
+        phone: supplier.phone || null,
+        email: supplier.email || null,
+      })
+      .select()
+      .single()
+    if (error) {
+      showToast('No se pudo crear el proveedor.', 'error')
+      return undefined
+    }
+    const newSupplier = rowToPurchaseSupplier(data)
+    setPurchaseSuppliers((prev) =>
+      [...prev, newSupplier].sort((a, b) => a.name.localeCompare(b.name)),
+    )
+    showToast('Proveedor creado correctamente.')
+    return newSupplier
+  }
+
+  const updatePurchaseSupplier = async (
+    supplierId: string,
+    updates: Omit<PurchaseSupplier, 'id'>,
+  ) => {
+    const { data, error } = await supabase
+      .from('purchase_suppliers')
+      .update({
+        name: updates.name,
+        phone: updates.phone || null,
+        email: updates.email || null,
+      })
+      .eq('id', supplierId)
+      .select()
+      .single()
+    if (error) {
+      showToast('No se pudo actualizar el proveedor.', 'error')
+      throw error
+    }
+    setPurchaseSuppliers((prev) =>
+      prev
+        .map((s) => (s.id === supplierId ? rowToPurchaseSupplier(data) : s))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    )
+    showToast('Proveedor actualizado correctamente.')
+  }
+
+  const deletePurchaseSupplier = async (supplierId: string) => {
+    const { error } = await supabase.from('purchase_suppliers').delete().eq('id', supplierId)
+    if (error) {
+      showToast('No se pudo eliminar el proveedor.', 'error')
+      throw error
+    }
+    setPurchaseSuppliers((prev) => prev.filter((s) => s.id !== supplierId))
+    showToast('Proveedor eliminado correctamente.')
+  }
+
   return (
     <AppContext.Provider
       value={{
@@ -699,6 +781,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         supplyTypes,
         supplyCostHistory,
         bomItems,
+        purchaseSuppliers,
         businessName,
         setBusinessName,
         loading,
@@ -720,6 +803,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         addBomItem,
         updateBomItem,
         deleteBomItem,
+        addPurchaseSupplier,
+        updatePurchaseSupplier,
+        deletePurchaseSupplier,
       }}
     >
       {children}

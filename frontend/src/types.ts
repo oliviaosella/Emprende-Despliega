@@ -77,6 +77,13 @@ export interface Purchase {
   date: string
 }
 
+export interface PurchaseSupplier {
+  id: string
+  name: string
+  phone?: string
+  email?: string
+}
+
 export interface SupplyCostHistoryEntry {
   id: string
   supplyId: string

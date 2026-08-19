@@ -1,228 +1,176 @@
-# MiniEmprende
+# Mi Negocio
 
-Proyecto fullstack moderno para un **mini sistema de gestion de emprendimientos**. 
+Aplicacion web para gestionar un pequeno emprendimiento de papeleria, arte o productos personalizados. Permite administrar inventario, insumos, compras, ventas, pedidos, contabilidad y perfil del negocio desde una interfaz simple en espanol.
 
-Sistema completo con inventario, ventas con soporte de pedidos personalizados, compras, contabilidad y dashboard en tiempo real.
+## Funcionalidades
+
+- Dashboard con metricas, alertas de bajo stock y ventas recientes.
+- Inventario de productos con categorias, stock minimo, precios y emojis.
+- Productos de reventa y productos fabricados.
+- Gestion de insumos, tipos de insumo y unidades de medida.
+- BOM / recetas de fabricacion para calcular costos de productos fabricados.
+- Punto de venta con carrito, metodos de pago y registro de pedidos personalizados.
+- Seguimiento de pedidos por estado: pendiente, en progreso y completado.
+- Registro de compras a proveedores, productos e insumos.
+- Historial de costos de insumos.
+- Contabilidad de ingresos, egresos e impuestos.
+- Perfil de usuario y negocio con autenticacion de Supabase.
+- Notificaciones de exito y error para operaciones principales.
+- Vista lista/cuadricula compartida en secciones clave.
 
 ## Stack
 
 ### Frontend
 
-- **Vite** (bundler ultra rápido)
-- **React 19** + TypeScript
-- **Tailwind CSS v4** (estilos)
-- **Framer Motion** (animaciones suaves)
-- **Lucide React** (iconografía)
-- Estructura modular escalable
+- React 19
+- TypeScript
+- Vite 8
+- Tailwind CSS 4
+- Framer Motion
+- Lucide React
+- Supabase Auth y Supabase PostgreSQL
 
 ### Backend
 
-- **Node.js** + Express + TypeScript
-- Variables de entorno con dotenv
-- Soporte CORS para desarrollo/producción
-- Estructura de capas (controllers, services, routes, models)
+El directorio `backend/` contiene una API Node.js/Express en TypeScript con un endpoint de health check. La app principal actualmente persiste datos directamente en Supabase desde el frontend.
 
-## Características ✨
+### Base de datos
 
-### 📊 Dashboard
-- Métricas en tiempo real: Ventas hoy, Ingresos mensuales, Valor inventario
-- Alertas de productos con bajo stock
-- Historial de últimas ventas
-- Saludo personalizado por hora
+El esquema de referencia esta en `supabase/schema.sql`. Incluye tablas principales, relaciones y politicas RLS para aislar los datos por usuario.
 
-### 📦 Gestión de Inventario
-- Búsqueda y filtro por categoría
-- Edición inline de stock
-- Indicadores de stock bajo
-- Emojis personalizados por producto
+## Estructura
 
-### 🛒 Ventas
-- Sistema de carrito interactivo
-- Métodos de pago: Efectivo, Transferencia, Tarjeta
-- **Sistema de Pedidos Personalizados**:
-  - Descripción personalizada
-  - Fecha de entrega
-  - Recordatorio automático
-  - Estados: Pendiente → En Progreso → Completado
-  - Countdown de entregas con alertas
+```text
+.
+├── frontend/              # App React principal
+│   ├── src/
+│   │   ├── components/    # Navegacion, toasts, controles reutilizables
+│   │   ├── lib/           # Cliente Supabase
+│   │   ├── pages/         # Dashboard, Inventario, Ventas, Compras, etc.
+│   │   ├── App.tsx
+│   │   ├── AppContext.tsx # Estado global y mutaciones contra Supabase
+│   │   └── types.ts
+│   └── package.json
+├── backend/               # API Express secundaria / health check
+├── supabase/
+│   └── schema.sql         # Esquema inicial de referencia
+└── README.md
+```
 
-### 📥 Compras
-- Registro de compras a proveedores
-- Actualización automática de stock
-- Historial de transacciones
+## Requisitos
 
-### 📊 Contabilidad
-- Tracking de ingresos y egresos
-- Balance general
-- Filtros por tipo de transacción
-## 🚀 Instalación & Ejecución
+- Node.js 20 o superior recomendado
+- npm
+- Proyecto de Supabase
 
-### Requisitos
-- Node.js 16+
-- npm o yarn
+## Configuracion
 
-### Setup Inicial
+### 1. Instalar dependencias
 
 ```bash
-# 1. Instalar dependencias del frontend
 cd frontend
 npm install
 
-# 2. Instalar dependencias del backend
 cd ../backend
 npm install
 ```
 
-### Desarrollo
+### 2. Configurar Supabase
 
-**Terminal 1 - Frontend (http://localhost:5173)**
-```bash
-cd frontend
-npm run dev
-```
+1. Crear un proyecto en Supabase.
+2. Ejecutar `supabase/schema.sql` en el SQL Editor de Supabase.
+3. Activar Email/Password en Authentication -> Providers.
+4. Crear al menos un usuario en Authentication -> Users.
 
-**Terminal 2 - Backend (http://localhost:4000)**
-```bash
-cd backend
-npm run dev
-```
+> Nota: si se agregaron migraciones nuevas durante el desarrollo, verificar que `supabase/schema.sql` este sincronizado con la base viva antes de preparar un entorno nuevo.
 
-El frontend está configurado con proxy para consumir el backend automáticamente.
+### 3. Variables de entorno
 
-### Build Producción
+Copiar los ejemplos y completar los valores locales:
 
 ```bash
-# Frontend
-cd frontend
-npm run build
-
-# Backend
-cd backend
-npm run build
+cp frontend/.env.example frontend/.env.local
+cp backend/.env.example backend/.env
 ```
 
-## 📁 Estructura de Carpetas
-
-```
-MiniEmprende/
-├── frontend/
-│   ├── src/
-│   │   ├── components/        # Sidebar, BottomNav
-│   │   ├── pages/             # Dashboard, Inventory, Sales, Purchases, Accounting
-│   │   ├── App.tsx            # Layout principal
-│   │   ├── AppContext.tsx      # State management & lógica de negocio
-│   │   ├── types.ts           # Definiciones TypeScript
-│   │   └── main.tsx
-│   ├── public/
-│   ├── vite.config.ts         # Configuración Vite + Proxy
-│   ├── tailwind.config.js     # Tema personalizado
-│   └── package.json
-│
-└── backend/
-    ├── src/
-    │   ├── routes/
-    │   ├── controllers/
-    │   ├── services/
-    │   ├── config/
-    │   └── index.ts           # Punto de entrada
-    ├── dist/                  # Build compilado
-    └── package.json
-```
-
-## 🎨 Personalización
-
-### Temas
-- **Colores**: Editar en `frontend/tailwind.config.js`
-- **Tipografía**: Google Fonts (Inter) en `src/index.css`
-- **Iconos**: Lucide React (cambia en componentes)
-
-### Agregar Productos Iniciales
-Editar mock data en `frontend/src/AppContext.tsx` (línea ~40)
-
-## 🔌 API Integration
-
-El backend tiene proxy configurado en Vite:
-- URLs `/api/*` redirigen automáticamente a `http://localhost:4000`
-- Listo para conectar servicios reales
-
-## Variables de entorno
-
-### Frontend
-
-Archivo: `frontend/.env`
+`frontend/.env.local`:
 
 ```env
+VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
+VITE_SUPABASE_ANON_KEY=tu-anon-key
 VITE_API_BASE_URL=/api
 ```
 
-### Backend
-
-Archivo: `backend/.env`
+`backend/.env`:
 
 ```env
 PORT=4000
 CORS_ORIGIN=http://localhost:5173
 ```
 
-Tambien puedes copiar desde `frontend/.env.example` y `backend/.env.example`.
+Los archivos `.env`, `.env.local` y variantes de produccion estan ignorados por Git. No subir credenciales reales al repositorio.
 
-## Endpoints iniciales
+## Desarrollo
 
-- `GET /api/health`
-
-Respuesta esperada:
-
-```json
-{
-  "status": "OK",
-  "service": "backend",
-  "timestamp": "2026-04-23T00:00:00.000Z"
-}
-```
-
-## Como correr el proyecto
-
-### 1. Backend
-
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-Servidor disponible en `http://localhost:4000`.
-
-### 2. Frontend
+Frontend:
 
 ```bash
 cd frontend
-npm install
 npm run dev
 ```
 
-Aplicacion disponible en `http://localhost:5173`.
+Disponible en `http://localhost:5173`.
+
+Backend opcional:
+
+```bash
+cd backend
+npm run dev
+```
+
+Disponible en `http://localhost:4000`.
+
+## Build
+
+Frontend:
+
+```bash
+cd frontend
+npm run build
+```
+
+Backend:
+
+```bash
+cd backend
+npm run build
+```
 
 ## Scripts
 
 ### Frontend
 
-- `npm run dev`: desarrollo
-- `npm run build`: build de produccion
-- `npm run start`: previsualizacion del build
+- `npm run dev`: servidor de desarrollo.
+- `npm run build`: typecheck y bundle de produccion.
+- `npm run preview`: previsualizacion local del build.
+- `npm run start`: alias de preview.
 
 ### Backend
 
-- `npm run dev`: desarrollo con recarga
-- `npm run build`: compilar TypeScript a `dist`
-- `npm run start`: ejecutar build compilado
+- `npm run dev`: servidor de desarrollo con recarga.
+- `npm run build`: compila TypeScript.
+- `npm run start`: ejecuta el build compilado.
 
-## Escalabilidad prevista
+## Publicacion en GitHub
 
-La base del proyecto queda preparada para agregar:
+Antes de publicar o pushear:
 
-- Gestion de clientes
-- Productos o servicios
-- Ventas
-- Dashboard con metricas
+1. Ejecutar `npm run build` en `frontend/`.
+2. Ejecutar `npm run build` en `backend/`.
+3. Confirmar que no haya credenciales en archivos trackeados.
+4. Confirmar que `.env.local`, `.env`, `node_modules/` y `dist/` no se suban.
+5. Revisar si los documentos internos (`AGENTS.md`, `CLAUDE.md`, `.agents/`) deben quedar en el repo publico o solo en uso local.
 
-Cada modulo puede crecer con su propio dominio (controladores, servicios, modelos y rutas) sin romper la estructura inicial.
+## Licencia
+
+Sin licencia definida por ahora. Si el repositorio va a ser publico, agregar una licencia antes de invitar contribuciones externas.

@@ -14,7 +14,17 @@
       "Bash(grep -n \"const { purchases, products, supplies, addPurchase }\\\\|Header\\\\|Lista de compras\\\\|grid grid-cols\" /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/frontend/src/pages/Purchases.tsx)",
       "Bash(grep -n \"bomItems,\\\\|value={{\" /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/frontend/src/AppContext.tsx)",
       "Bash(mkdir -p /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/.claude/skills/continuar-proyecto)",
-      "Bash(grep -n \"Unidad de medida \\\\*\\\\|Costo vigente \\\\*\\\\|Activo$\\\\|form.active\" /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/frontend/src/pages/Supplies.tsx)"
+      "Bash(grep -n \"Unidad de medida \\\\*\\\\|Costo vigente \\\\*\\\\|Activo$\\\\|form.active\" /Users/oliviagarciaosella/Documents/olivia_personal_proy/Emprende-Despliega/frontend/src/pages/Supplies.tsx)",
+      "Bash(ls -la \"/Users/oliviagarciaosella/Documents/Proyectos/pruebas-bd/custom/addons/\" | head -50)",
+      "Bash(echo \"=== hotel_planning_custom manifest ===\" *)",
+      "Bash(gh api *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git -C /Users/oliviagarciaosella/Documents/Proyectos/pruebas-bd status --short)",
+      "Bash(awk '{print $1}')",
+      "Bash(find ~ -maxdepth 6 -iname \"*cayasta*\" -o -iname \"*gantt*reserv*\" 2>/dev/null | grep -v -E \"Library|node_modules\" | head -50)",
+      "mcp__39dbdff6-e940-42c9-b326-b2e7e43c9989__search_records",
+      "mcp__39dbdff6-e940-42c9-b326-b2e7e43c9989__get_fields"
     ]
   }
 }
